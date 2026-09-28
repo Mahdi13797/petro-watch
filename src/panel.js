@@ -9,12 +9,13 @@ const PetroWatch = (() => {
   const CAN = { tsetmc: true, codal: !!PW_GM || SITE === 'codal' };
 
   // ---------------------------------------------------------------- dictionaries
-  const PEERS = ['فارس', 'شپدیس', 'نوری', 'جم', 'پارس', 'تاپیکو', 'پترول', 'شیراز', 'زاگرس', 'مارون', 'آریا', 'شگویا', 'بوعلی', 'کرماشا', 'شخارک', 'شفن', 'تابان', 'وپترو', 'شیران', 'پارسان'];
+  // default watchlist: refineries / oil products (group 23)
+  const PEERS = ['شپنا', 'شتران', 'شبندر', 'شبریز', 'شسپا', 'شراز', 'شاوان', 'شرانل', 'شنفت', 'شپاس', 'شبهرن'];
   const TYPE_FA = { MONTHLY: 'گزارش ماهانه', PORTFOLIO_NAV: 'صورت وضعیت پورتفوی', FS_EXPLAIN: 'توضیح صورت مالی', INTERIM_FS: 'صورت مالی میاندوره‌ای',
     ANNUAL_FS: 'صورت مالی سالانه', AGM_DECISION: 'تصمیمات مجمع', AGM_NOTICE: 'دعوت به مجمع', DIV_SCHEDULE: 'زمان‌بندی پرداخت سود',
     CAPINC_PROPOSAL: 'پیشنهاد افزایش سرمایه', CAPINC_STEP: 'افزایش سرمایه', EGM: 'مجمع فوق‌العاده', RUMOR_CLARIFY: 'شفاف‌سازی شایعه',
     BOARD_CEO_CHANGE: 'تغییر مدیرعامل/هیئت‌مدیره', HALT: 'توقف/تعلیق نماد', REGULATORY_COURT: 'دیوان/شورای رقابت', UTILITY_RATES: 'نرخ سرویس‌های جانبی',
-    FEED_GAS_PRICE: 'نرخ گاز خوراک', SHUTDOWN: 'توقف تولید/تعمیرات', RESTART: 'شروع مجدد تولید', CONTRACT: 'قرارداد', LEGAL: 'دعوی حقوقی',
+    FEED_GAS_PRICE: 'نرخ خوراک/گاز', SHUTDOWN: 'توقف تولید/تعمیرات', RESTART: 'شروع مجدد تولید', CONTRACT: 'قرارداد', LEGAL: 'دعوی حقوقی',
     MATERIAL_OTHER: 'افشای اطلاعات بااهمیت', OTHER: 'سایر' };
   const CODAL_PTS = { AGM_DECISION: -1, BOARD_CEO_CHANGE: -1, SHUTDOWN: -1, RUMOR_CLARIFY: -1, CAPINC_PROPOSAL: 1, CAPINC_STEP: 1 };
   const GROUP_NEWS = new Set(['REGULATORY_COURT', 'UTILITY_RATES', 'FEED_GAS_PRICE']);
@@ -117,7 +118,7 @@ const PetroWatch = (() => {
       h += sec('جریان پول حقیقی/حقوقی', flowsHtml(t.flows), false);
       h += sec('اندیکاتورهای روزانه', dailyHtml(t.daily), false);
       if (t.intraday_today) h += sec('درون‌روز امروز', intradayHtml(t.intraday_today), false);
-      h += sec('گروه ۴۴ و شاخص‌ها', groupHtml(t.group), false);
+      h += sec(`گروه ${esc((t.group && t.group.sector_code) || '')} و شاخص‌ها`, groupHtml(t.group), false);
       h += sec('دفتر سفارش', obHtml(t.order_book), false);
       h += sec('سهامداران عمده', holdersHtml(t.holders), false);
       h += sec('بنیادی سریع', fundHtml(t), false);
@@ -148,10 +149,11 @@ const PetroWatch = (() => {
 
   function sumCard(t, codal) {
     const r = t.rubric || {}, s = situation(t), cal = r.calibration_for_this_band || {}, base = r.base_rate_this_regime || {};
-    const g = t.group || {}, reg = r.regime || g.regime;
+    const g = t.group || {}, reg = r.regime || g.regime, gix = g.group_index || g.chem44_index;
     const regCls = reg === 'hot' ? 'hot' : reg === 'cold' ? 'cold' : '';
     let h = `<div class="card sum"><div class="top"><div><span class="lbl">موقعیت</span> <b>${s.code}</b> · ${s.fa}</div>
-      <div><span class="lbl">رژیم گروه</span> <span class="badge ${regCls}">${REG_FA[reg] || '—'}</span> <span class="muted small">شاخص ۴۴ در ۲۰ روز ${SP(g.chem44_index && g.chem44_index.r20)}</span></div></div>`;
+      <div><span class="lbl">رژیم گروه</span> <span class="badge ${regCls}">${REG_FA[reg] || '—'}</span> <span class="muted small">شاخص گروه در ۲۰ روز ${SP(gix && gix.r20)}</span></div></div>`;
+    if (r.calibration_applies_to_this_group === false) h += `<div class="note warn">این نماد در گروه ${esc(g.sector_code || '')} است. احتمال‌ها و edge از آزمون ۱۳ سالهٔ گروه ۴۴ (پتروشیمی) آمده و برای این گروه آزموده نشده؛ اطمینان پایین.</div>`;
     const ch = codalHints(codal);
     if (s.code === 'D' && r.applicable !== false) {
       const edge = r.edge_vs_base_5d_pp, p5 = cal.p_up_5d;
@@ -264,14 +266,15 @@ const PetroWatch = (() => {
 
   function groupHtml(g) {
     if (!g) return '—';
+    const gi = g.group_index || g.chem44_index;
     const ix = (o, k) => o ? kv(k, SP(o.r1) + ' / ' + SP(o.r5) + ' / ' + SP(o.r20)) : '';
     return `<div class="kv">${kv('رژیم', `<span class="badge">${REG_FA[g.regime] || '—'}</span>`)}${kv('نمادهای معامله‌شده', num(g.n_traded))}${kv('درصد نمادهای مثبت', P(g.pct_up))}
       ${kv('صف خرید / فروش', num(g.buy_queues) + ' / ' + num(g.sell_queues))}${kv('میانگین تغییر قیمت', sgn(g.avg_change_pct, 2, '٪'))}
       ${kv('جریان حقیقی گروه بدون این نماد', SP(g.indiv_net_flow_pct_of_value_ex_self) + ' · ' + sgn(g.indiv_net_flow_billion_toman_ex_self, 1, ' میلیارد ت'))}
       ${kv('سهم این نماد از ارزش گروه', P(g.this_symbol_share_of_group_value, 1))}${kv('خالص حقیقی این نماد', sgn(g.this_symbol_indiv_net_billion_toman, 1, ' میلیارد ت'))}
-      ${ix(g.chem44_index, 'شاخص ۴۴: ۱ / ۵ / ۲۰ روز')}${kv('شاخص ۴۴ بالای SMA50', g.chem44_index ? (g.chem44_index.above_sma50 ? 'بله' : 'خیر') : '—')}
+      ${ix(gi, `شاخص گروه (${esc(fixFa(g.group_index_name || ''))}): ۱ / ۵ / ۲۰ روز`)}${kv('شاخص گروه بالای SMA50', gi ? (gi.above_sma50 ? 'بله' : 'خیر') : '—')}
       ${ix(g.total_index, 'شاخص کل: ۱ / ۵ / ۲۰ روز')}</div>
-      ${g.chem44_index && g.chem44_index.live_appended ? '<p class="small muted">مقدار امروز شاخص از منبع زنده اضافه شد.</p>' : ''}<p class="muted small">${esc(g.regime_rule || '')}</p>`;
+      ${gi && gi.live_appended ? '<p class="small muted">مقدار امروز شاخص از منبع زنده اضافه شد.</p>' : ''}<p class="muted small">${esc(g.regime_rule || '')}</p>`;
   }
 
   function obHtml(o) {

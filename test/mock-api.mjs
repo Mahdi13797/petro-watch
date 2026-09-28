@@ -41,7 +41,7 @@ function tsetmc(path) {
   const { rows, flows, today, ix44, ixT, peers } = D;
   const hist = rows.slice(0, -1), live = rows[rows.length - 1];
   if (path.startsWith('Instrument/GetInstrumentSearch/')) return { instrumentSearch: [{ insCode: IC, lVal18AFC: SYM, lVal30: 'پتروشيمي نمونه (داده ساختگي)', flow: 1, flowTitle: 'بازار اول (تابلوي اصلي) بورس', cgrValCot: 'N1' }] };
-  if (path.startsWith('Instrument/GetInstrumentInfo/')) return { instrumentInfo: { lVal18AFC: SYM, eps: { estimatedEPS: 1150, sectorPE: 7.9 }, zTitad: 6e9, sector: { lSecVal: 'محصولات شيميايي' }, qTotTran5JAvg: 5.2e6, kAjCapValCpsIdx: 17,
+  if (path.startsWith('Instrument/GetInstrumentInfo/')) return { instrumentInfo: { lVal18AFC: SYM, eps: { estimatedEPS: 1150, sectorPE: 7.9 }, zTitad: 6e9, sector: { cSecVal: '44 ', lSecVal: 'محصولات شيميايي' }, qTotTran5JAvg: 5.2e6, kAjCapValCpsIdx: 17,
     staticThreshold: { psGelStaMin: Math.round(live.priceYesterday * 0.97), psGelStaMax: Math.round(live.priceYesterday * 1.03) } } };
   if (path.startsWith('ClosingPrice/GetClosingPriceInfo/')) return { closingPriceInfo: { ...live, finalLastDate: live.dEven, instrumentState: { cEtavalTitle: 'مجاز' } } };
   if (path.startsWith('BestLimits/')) { const c = live.pDrCotVal; return { bestLimits: [0, 1, 2, 3, 4].map(k => ({ number: k + 1, zOrdMeDem: 20 - 3 * k, qTitMeDem: 40000 + 9000 * k, pMeDem: c - 10 * (k + 1), pMeOf: c + 10 * k, qTitMeOf: 25000 + 7000 * k, zOrdMeOf: 12 - 2 * k })) }; }
@@ -58,7 +58,7 @@ function tsetmc(path) {
   if (path.startsWith('ClosingPrice/GetMarketWatch')) return { marketwatch: [...peers, { insCode: IC, lva: SYM, csv: '44 ', qtc: live.qTotCap, py: live.priceYesterday, pcl: live.pClosing, pdv: live.pDrCotVal, pMax: Math.round(live.priceYesterday * 1.03), pMin: Math.round(live.priceYesterday * 0.97), blDs: [{ qmo: 1, qmd: 1 }] }] };
   if (path.startsWith('ClientType/GetClientTypeAll')) return { clientTypeAllDto: [...peers.map((x, k) => ({ insCode: x.insCode, buy_I_Volume: 1e6 * (1 + (k % 3)), sell_I_Volume: 1e6 * (1 + (k % 4)) })), { insCode: IC, buy_I_Volume: 9e6, sell_I_Volume: 5e6 }] };
   if (path.startsWith('Index/GetIndexB2History/')) { const s = path.endsWith(IX44) ? ix44 : ixT; return { indexB2: s.slice(0, -1).reverse() }; }
-  if (path.startsWith('Index/GetIndexB1LastAll/')) return { indexB1: [{ insCode: IX44, xDrNivJIdx004: ix44[ix44.length - 1].xNivInuClMresIbs }, { insCode: IXT, xDrNivJIdx004: ixT[ixT.length - 1].xNivInuClMresIbs }] };
+  if (path.startsWith('Index/GetIndexB1LastAll/')) return { indexB1: [{ insCode: IX44, lVal30: '44-شيميايي', xDrNivJIdx004: ix44[ix44.length - 1].xNivInuClMresIbs }, { insCode: IXT, lVal30: 'شاخص كل', xDrNivJIdx004: ixT[ixT.length - 1].xNivInuClMresIbs }] };
   if (path.startsWith('Trade/GetTrade/')) { const r = rng(7), tr = []; let px = live.priceYesterday, n = 1;
     for (let m = 0; m < 210; m += 2) { px = Math.round(px * (1 + 0.002 * gauss(r) + 0.0002)); const hh = 9 + Math.floor(m / 60), mm = m % 60; tr.push({ nTran: n++, hEven: hh * 10000 + mm * 100 + 5, pTran: px, qTitTran: Math.round(5000 + 40000 * r()), canceled: 0 }); }
     return { trade: tr }; }

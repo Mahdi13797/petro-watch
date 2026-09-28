@@ -10,6 +10,7 @@
    (hot / mid / cold) with the regime-conditioned calibration table, AGM/HTML letters.
    v2.1: `trend` block — daily / weekly (completed weeks) / yearly trend, alignment, 60-day regression channel.
    v2.1.1: group block — MarketWatch no longer returns `flow`; a missing flow no longer drops every symbol.
+   v2.1.2: group block uses the symbol's own sector (e.g. 23 = refineries) and its index for regime; codal peers follow the group.
    ========================================================================== */
 
 async function petroSnapshot(symbol) {
@@ -243,26 +244,35 @@ async function petroSnapshot(symbol) {
   const lastHold = await J(`Shareholder/GetInstrumentShareHolderLast/${ic}`, 2);
   out.holders = { top: (lastHold?.shareHolder || []).slice(0, 8).map(x => [x.shareHolderName, R(x.perOfShares, 2), cls(x.shareHolderName)]), changes_6d: hd };
 
-  // ---------- 9) group (44) breadth, flows EXCLUDING this symbol, index context + live append
+  // ---------- 9) the symbol's own group (sector code from InstrumentInfo, e.g. 44 = chemicals, 23 = refineries):
+  //               breadth, flows EXCLUDING this symbol, group index (found by name "<code>-...") + total index, live append
+  const SEC = String(I.sector?.cSecVal || '').trim() || '44';
   const mw = await J('ClosingPrice/GetMarketWatch?market=0&paperTypes[0]=1&paperTypes[1]=2&showTraded=false&withBestLimits=true');
-  const G = (mw?.marketwatch || []).filter(x => (x.csv || '').trim() === '44' && (x.flow == null || [1, 2, 4].includes(x.flow)) && !/\d$/.test(x.lva) && x.qtc > 0);
+  const G = (mw?.marketwatch || []).filter(x => (x.csv || '').trim() === SEC && (x.flow == null || [1, 2, 4].includes(x.flow)) && !/\d$/.test(x.lva) && x.qtc > 0);
   const cta = await J('ClientType/GetClientTypeAll'); const CTA = {}; (cta?.clientTypeAllDto || []).forEach(x => CTA[x.insCode] = x);
   let netI = 0, tv = 0, selfNet = 0, selfVal = 0;
   G.forEach(x => { const c = CTA[x.insCode]; if (!c) return; const nI = (c.buy_I_Volume - c.sell_I_Volume) * x.pcl; if (x.insCode === ic) { selfNet = nI; selfVal = x.qtc; } else { netI += nI; tv += x.qtc; } });
   const qb = G.filter(x => x.pdv >= x.pMax && x.blDs?.[0]?.qmo === 0).length, qsl = G.filter(x => x.pdv <= x.pMin && x.blDs?.[0]?.qmd === 0).length;
-  const [ix44, ixT, ixLive] = await Promise.all([J('Index/GetIndexB2History/33626672012415176'), J('Index/GetIndexB2History/32097828799138957'), J('Index/GetIndexB1LastAll/All/1')]);
-  const liveIdx = {}; (ixLive?.indexB1 || Object.values(ixLive || {})[0] || []).forEach(x => liveIdx[x.insCode] = x.xDrNivJIdx004);
+  const ixLive = await J('Index/GetIndexB1LastAll/All/1');
+  const liveList = ixLive?.indexB1 || Object.values(ixLive || {})[0] || [];
+  const secIdx = liveList.find(x => String(x.lVal30 || '').trim().startsWith(SEC + '-'));
+  const GI = secIdx ? String(secIdx.insCode) : '33626672012415176';
+  if (!secIdx && SEC !== '44') out.warnings.push(`شاخص گروه ${SEC} پیدا نشد؛ شاخص ۴۴ به‌جای آن استفاده شد`);
+  const [ixG, ixT] = await Promise.all([J('Index/GetIndexB2History/' + GI), J('Index/GetIndexB2History/32097828799138957')]);
+  const liveIdx = {}; liveList.forEach(x => liveIdx[x.insCode] = x.xDrNivJIdx004);
   const idx = (h, code) => { const rows = (h?.indexB2 || []).sort((x, y) => x.dEven - y.dEven); const a = rows.map(x => x.xNivInuClMresIbs); let appended = false;
     if (last.d > (rows[rows.length - 1]?.dEven || 0) && liveIdx[code]) { a.push(liveIdx[code]); appended = true; }
     const k = a.length - 1; const m50 = a.slice(k - 49, k + 1).reduce((s, x) => s + x, 0) / 50; return { level: a[k], r1: R(a[k] / a[k - 1] - 1), r5: R(a[k] / a[k - 5] - 1), r20: R(a[k] / a[k - 20] - 1), above_sma50: a[k] > m50, live_appended: appended }; };
-  const c44 = idx(ix44, '33626672012415176');
-  const regime = c44.r20 > 0.10 ? 'hot' : c44.r20 < -0.05 ? 'cold' : 'mid';
-  out.group = { n_traded: G.length, pct_up: R(G.filter(x => x.pdv > x.py).length / G.length, 2), buy_queues: qb, sell_queues: qsl,
+  const cG = idx(ixG, GI);
+  const regime = cG.r20 > 0.10 ? 'hot' : cG.r20 < -0.05 ? 'cold' : 'mid';
+  out.group = { sector_code: SEC, sector_name: I.sector?.lSecVal || null, group_index_name: secIdx?.lVal30 || '44-شيميايي',
+    n_traded: G.length, pct_up: R(G.filter(x => x.pdv > x.py).length / G.length, 2), buy_queues: qb, sell_queues: qsl,
     avg_change_pct: R(100 * G.reduce((s, x) => s + (x.pcl / x.py - 1), 0) / G.length, 2),
     indiv_net_flow_pct_of_value_ex_self: R(netI / tv, 3), indiv_net_flow_billion_toman_ex_self: R(netI / 1e10, 1),
     this_symbol_share_of_group_value: R(selfVal / (tv + selfVal), 3), this_symbol_indiv_net_billion_toman: R(selfNet / 1e10, 1),
-    chem44_index: c44, total_index: idx(ixT, '32097828799138957'), regime,
-    regime_rule: 'hot = شاخص ۴۴ در ۲۰ روز بیش از +۱۰٪؛ cold = کمتر از −۵٪؛ بقیه mid' };
+    group_index: cG, chem44_index: SEC === '44' ? cG : null, total_index: idx(ixT, '32097828799138957'), regime,
+    regime_rule: 'hot = شاخص همین گروه در ۲۰ روز بیش از +۱۰٪؛ cold = کمتر از −۵٪؛ بقیه mid' };
+  if (SEC !== '44') out.warnings.push(`نماد در گروه ${SEC} (${I.sector?.lSecVal || ''}) است، نه گروه ۴۴: جدول کالیبراسیون روی گروه ۴۴ برآورد شده و برای این نماد آزموده نشده (اطمینان پایین)`);
 
   // ---------- 10) today's intraday (5-minute bars) — with timeout, optional
   const tr = await J(`Trade/GetTrade/${ic}`, 2, 12000); const T5 = {};
@@ -309,7 +319,7 @@ async function petroSnapshot(symbol) {
     calibration_for_this_band: { n: cal[0], p_up_1d: cal[1], p_up_3d: cal[2], p_up_5d: cal[3], p_up_10d: cal[4], median_5d_pct: cal[5], avg_gain_5d_pct: cal[6], avg_loss_5d_pct: cal[7] },
     base_rate_this_regime: { p_up_1d: base[1], p_up_5d: base[3], median_5d_pct: base[5] },
     edge_vs_base_5d_pp: Math.round(100 * (cal[3] - base[3])),
-    applicable: !newIPO,
+    applicable: !newIPO, calibrated_on_group: '44', calibration_applies_to_this_group: SEC === '44',
     note: newIPO ? 'سهم تازه‌عرضه است: جدول کالیبراسیون قابل‌اتکا نیست؛ از بلوک ipo استفاده کن' : 'امتیاز کدال را اضافه کن و باند را دوباره تعیین کن؛ لبه = اختلاف با نرخ پایهٔ همین رژیم',
     tradability: d.closed_at_upper_limit ? 'در صف خرید بسته شده — خرید عملاً ممکن نیست' : d.closed_at_lower_limit ? 'در صف فروش بسته شده — فروش عملاً ممکن نیست' : 'قابل معامله' };
   return out;
@@ -381,7 +391,9 @@ async function codalSnapshot(symbol, days = 120) {
         const sub = {}; tb.cells.filter(c => c.rowSequence === 2).forEach(c => sub[c.columnSequence] = c.value || '');
         const groups = tb.cells.filter(c => c.rowSequence === 1).map(c => { let amt = null; for (let k = c.columnSequence; k < c.columnSequence + (c.colSpan || 1); k++) if (/مبلغ/.test(sub[k] || '')) amt = k; return [c.value, amt ? Number(String(row[amt] || '').replace(/,/g, '')) : null]; }).filter(g => g[1] !== null);
         monthly.push({ period: ds.periodEndToDate, published: m.published, groups_million_rial: groups }); break; } } catch (e) {} }
-  const peers = ['فارس', 'شپدیس', 'نوری', 'جم', 'پارس', 'تاپیکو', 'پترول', 'شیراز', 'زاگرس', 'مارون', 'آریا', 'شگویا', 'بوعلی', 'کرماشا'];
+  const REFINERY = ['شپنا', 'شتران', 'شبندر', 'شبریز', 'شسپا', 'شراز', 'شاوان', 'شرانل', 'شنفت', 'شپاس', 'شبهرن'];
+  const PETRO = ['فارس', 'شپدیس', 'نوری', 'جم', 'پارس', 'تاپیکو', 'پترول', 'شیراز', 'زاگرس', 'مارون', 'آریا', 'شگویا', 'بوعلی', 'کرماشا'];
+  const peers = (REFINERY.includes(fa(symbol)) ? REFINERY : PETRO).filter(p => p !== fa(symbol));
   const f10 = jal(new Date(now - 10 * 864e5)); const sector = [];
   for (const p of peers) { await sleep(700); const j = await J(q(p, f10, to, 1)); (j?.Letters || []).forEach(x => { const ty = classify(x.Title); if (['REGULATORY_COURT', 'UTILITY_RATES', 'FEED_GAS_PRICE', 'SHUTDOWN', 'RESTART', 'HALT'].includes(ty)) sector.push({ symbol: x.Symbol, type: ty, title: x.Title, published: toDig(x.PublishDateTime), url: 'https://www.codal.ir' + x.Url }); }); }
   const recent = t => L.filter(x => x.type === t).slice(0, 1).map(x => x.published)[0] || null;

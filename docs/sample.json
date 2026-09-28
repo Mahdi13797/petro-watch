@@ -1,13 +1,13 @@
 {
  "tool": "petro-watch",
- "version": "2.1.1",
+ "version": "2.1.2",
  "symbol": "نمونه",
- "collected_at": "2026-09-28T12:33:40.565Z",
+ "collected_at": "2026-09-28T13:44:39.366Z",
  "codal_days": 120,
  "tsetmc": {
   "symbol": "نمونه",
   "version": 2,
-  "generated_at": "2026-09-28T12:33:40.589Z",
+  "generated_at": "2026-09-28T13:44:39.386Z",
   "warnings": [],
   "instrument": {
    "insCode": "1234567890123456",
@@ -373,6 +373,9 @@
    ]
   },
   "group": {
+   "sector_code": "44",
+   "sector_name": "محصولات شيميايي",
+   "group_index_name": "44-شيميايي",
    "n_traded": 25,
    "pct_up": 0.8,
    "buy_queues": 0,
@@ -382,6 +385,14 @@
    "indiv_net_flow_billion_toman_ex_self": -22.4,
    "this_symbol_share_of_group_value": 0.012,
    "this_symbol_indiv_net_billion_toman": 3.3,
+   "group_index": {
+    "level": 1295383,
+    "r1": 0.0065,
+    "r5": 0.0185,
+    "r20": 0.0292,
+    "above_sma50": true,
+    "live_appended": true
+   },
    "chem44_index": {
     "level": 1295383,
     "r1": 0.0065,
@@ -399,7 +410,7 @@
     "live_appended": true
    },
    "regime": "mid",
-   "regime_rule": "hot = شاخص ۴۴ در ۲۰ روز بیش از +۱۰٪؛ cold = کمتر از −۵٪؛ بقیه mid"
+   "regime_rule": "hot = شاخص همین گروه در ۲۰ روز بیش از +۱۰٪؛ cold = کمتر از −۵٪؛ بقیه mid"
   },
   "intraday_today": {
    "first_trade_time": "09:00",
@@ -553,6 +564,8 @@
    },
    "edge_vs_base_5d_pp": 11,
    "applicable": true,
+   "calibrated_on_group": "44",
+   "calibration_applies_to_this_group": true,
    "note": "امتیاز کدال را اضافه کن و باند را دوباره تعیین کن؛ لبه = اختلاف با نرخ پایهٔ همین رژیم",
    "tradability": "قابل معامله"
   }
