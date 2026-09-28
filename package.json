@@ -1,0 +1,11 @@
+{
+  "name": "petro-watch",
+  "version": "2.1.0",
+  "private": true,
+  "description": "دیدبان پتروشیمی — پنل جمع‌آوری داده از tsetmc و کدال برای عامل تحلیل سهام پتروشیمی",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs && node test/e2e.mjs"
+  }
+}

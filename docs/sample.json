@@ -1,0 +1,705 @@
+{
+ "tool": "petro-watch",
+ "version": "2.1.0",
+ "symbol": "نمونه",
+ "collected_at": "2026-09-28T08:45:08.120Z",
+ "codal_days": 120,
+ "tsetmc": {
+  "symbol": "نمونه",
+  "version": 2,
+  "generated_at": "2026-09-28T08:45:08.144Z",
+  "warnings": [],
+  "instrument": {
+   "insCode": "1234567890123456",
+   "name": "پتروشيمي نمونه (داده ساختگي)",
+   "market": "بازار اول (تابلوي اصلي) بورس",
+   "board": "N1",
+   "state": "مجاز"
+  },
+  "fundamental_quick": {
+   "eps_estimated": 1150,
+   "sector_pe": 7.9,
+   "shares": 6000000000,
+   "sector": "محصولات شيميايي",
+   "avg_volume_3m": 5200000,
+   "free_float_pct": 17,
+   "price_limits_today": [
+    7978,
+    8472
+   ]
+  },
+  "daily": {
+   "date": 20260928,
+   "live_row": true,
+   "close": 8234,
+   "last": 8341,
+   "yesterday": 8225,
+   "high": 8358,
+   "low": 8170,
+   "open": 8268,
+   "chg_close_pct": 0.11,
+   "chg_last_pct": 1.41,
+   "history_days": 430,
+   "ret_5d": 0.0321,
+   "ret_20d": 0.1584,
+   "ret_60d": 0.2026,
+   "ret_240d": 0.4557,
+   "sma20": 7768,
+   "sma50": 7665,
+   "sma100": 7464,
+   "rsi14": 68.4,
+   "macd_hist": 45.7,
+   "macd_cross": null,
+   "adx14": 29.2,
+   "plus_di": 33,
+   "minus_di": 11.9,
+   "atr_pct": 0.0217,
+   "bollinger_pctb": 0.84,
+   "donchian20_high": 8294,
+   "donchian20_low": 7060,
+   "vol_ratio_20": 0.71,
+   "value_today": 31646917896,
+   "last_minus_close_pct": 1.3,
+   "adjustments_last_year": [
+    [
+     20260317,
+     0.88
+    ]
+   ],
+   "closed_at_upper_limit": false,
+   "closed_at_lower_limit": false,
+   "trend_class": "strong_up",
+   "buy_queue_streak_before_today": 0,
+   "up_day_streak_before_today": 3
+  },
+  "chart": {
+   "structure": "صعودی (HH/HL)",
+   "swing_highs": [
+    [
+     20260819,
+     7915
+    ],
+    [
+     20260905,
+     7475
+    ],
+    [
+     20260916,
+     8158
+    ]
+   ],
+   "swing_lows": [
+    [
+     20260826,
+     7173
+    ],
+    [
+     20260831,
+     7060
+    ],
+    [
+     20260922,
+     7866
+    ]
+   ],
+   "levels_sorted_high_to_low": [
+    [
+     "سقف دیروز",
+     8294,
+     0.7
+    ],
+    [
+     "سقف ۲۰ روزه",
+     8294,
+     0.7
+    ],
+    [
+     "آخرین سقف چرخشی",
+     8158,
+     -0.9
+    ],
+    [
+     "کف دیروز",
+     8106,
+     -1.6
+    ],
+    [
+     "گره حجمی 3",
+     8075,
+     -1.9
+    ],
+    [
+     "گره حجمی 1",
+     7994,
+     -2.9
+    ],
+    [
+     "آخرین کف چرخشی",
+     7866,
+     -4.5
+    ],
+    [
+     "SMA20",
+     7768,
+     -5.7
+    ],
+    [
+     "SMA50",
+     7665,
+     -6.9
+    ],
+    [
+     "VWAP لنگر ۶۰ روزه",
+     7524,
+     -8.6
+    ],
+    [
+     "گره حجمی 2",
+     7265,
+     -11.8
+    ],
+    [
+     "کف ۲۰ روزه",
+     7060,
+     -14.3
+    ]
+   ],
+   "nearest_resistance": [
+    "سقف ۲۰ روزه",
+    8294,
+    0.7
+   ],
+   "nearest_support": [
+    "آخرین سقف چرخشی",
+    8158,
+    -0.9
+   ],
+   "close_above_last_swing_high": false,
+   "close_below_last_swing_low": false,
+   "tested_last_swing_low_and_held": false,
+   "note": "levels: [نام، قیمت تعدیل‌شده، فاصله از قیمت پایانی ٪]"
+  },
+  "trend": {
+   "note": "زمینه است، امتیاز ندارد؛ قاعدهٔ استفاده در بخش «روند چندافقی» پرامپت",
+   "daily": "up",
+   "weekly": "up",
+   "weekly_sma10": 7637,
+   "weekly_sma30": 7461,
+   "weekly_structure": "LH/LL",
+   "yearly": "up",
+   "sma200": 7288,
+   "position_in_52w_range": 0.92,
+   "alignment": "all_up",
+   "channel60": {
+    "kind": "none",
+    "slope_60d_pct": 10.5,
+    "r2": 0.3,
+    "z_vs_yesterdays_channel": 0.85,
+    "lower_line_today": 7233,
+    "upper_line_today": 8691
+   }
+  },
+  "order_book": {
+   "queue": "none",
+   "top5": [
+    [
+     20,
+     40000,
+     8331,
+     8341,
+     25000,
+     12
+    ],
+    [
+     17,
+     49000,
+     8321,
+     8351,
+     32000,
+     10
+    ],
+    [
+     14,
+     58000,
+     8311,
+     8361,
+     39000,
+     8
+    ],
+    [
+     11,
+     67000,
+     8301,
+     8371,
+     46000,
+     6
+    ],
+    [
+     8,
+     76000,
+     8291,
+     8381,
+     53000,
+     4
+    ]
+   ],
+   "queue_value_billion_toman": 0,
+   "note": "ستون‌ها: تعداد خریدار، حجم خرید، قیمت خرید، قیمت فروش، حجم فروش، تعداد فروشنده"
+  },
+  "flows": {
+   "buyer_power_today": 5.79,
+   "buyer_power_5d": 1.55,
+   "buyer_power_reliable": true,
+   "per_capita_buy_toman": 11198140,
+   "per_capita_sell_toman": 1933978,
+   "per_capita_buy_vs_60d_median": 3.88,
+   "indiv_buyers": 260,
+   "indiv_sellers": 900,
+   "indiv_net_today_pct_of_value": 0.37,
+   "indiv_net_5d_pct": 0.048,
+   "indiv_net_20d_pct": 0.006,
+   "indiv_net_today_billion_toman": 1.2,
+   "inst_net_today_billion_toman": -1.2,
+   "inst_buy_share": 0.08,
+   "inst_sell_share": 0.45,
+   "last10": [
+    [
+     20260915,
+     1.27,
+     -0.7,
+     0.7
+    ],
+    [
+     20260916,
+     1.63,
+     0.2,
+     -0.2
+    ],
+    [
+     20260919,
+     0.78,
+     -0.6,
+     0.6
+    ],
+    [
+     20260920,
+     0.54,
+     0.2,
+     -0.2
+    ],
+    [
+     20260921,
+     0.58,
+     -0.8,
+     0.8
+    ],
+    [
+     20260922,
+     2.02,
+     1.4,
+     -1.4
+    ],
+    [
+     20260923,
+     2.06,
+     0.1,
+     -0.1
+    ],
+    [
+     20260926,
+     0.43,
+     -0.6,
+     0.6
+    ],
+    [
+     20260927,
+     0.5,
+     -1,
+     1
+    ],
+    [
+     20260928,
+     5.79,
+     1.2,
+     -1.2
+    ]
+   ],
+   "note": ""
+  },
+  "holders": {
+   "top": [
+    [
+     "شركت سرمايه گذاري نمونه-سهامي عام-",
+     38.2,
+     "investment_co"
+    ],
+    [
+     "صندوق بازنشستگي نمونه",
+     11.4,
+     "pension"
+    ],
+    [
+     "BFMصندوق بازارگرداني نمونه",
+     3.1,
+     "market_maker"
+    ],
+    [
+     "شخص حقيقي",
+     1.2,
+     "individual"
+    ]
+   ],
+   "changes_6d": [
+    {
+     "date": 20260926,
+     "holder": "BFMصندوق بازارگرداني نمونه",
+     "type": "market_maker",
+     "delta_shares": 6000000,
+     "value_billion_toman": 4.87,
+     "now_pct": 3.1,
+     "new_above_1pct": false,
+     "dropped_below_1pct": false
+    },
+    {
+     "date": 20260926,
+     "holder": "صندوق بازنشستگي نمونه",
+     "type": "pension",
+     "delta_shares": -6000000,
+     "value_billion_toman": -4.87,
+     "now_pct": 11.4,
+     "new_above_1pct": false,
+     "dropped_below_1pct": false
+    }
+   ]
+  },
+  "group": {
+   "n_traded": 25,
+   "pct_up": 0.8,
+   "buy_queues": 0,
+   "sell_queues": 0,
+   "avg_change_pct": 0.83,
+   "indiv_net_flow_pct_of_value_ex_self": -0.086,
+   "indiv_net_flow_billion_toman_ex_self": -22.4,
+   "this_symbol_share_of_group_value": 0.012,
+   "this_symbol_indiv_net_billion_toman": 3.3,
+   "chem44_index": {
+    "level": 1295383,
+    "r1": 0.0065,
+    "r5": 0.0185,
+    "r20": 0.0292,
+    "above_sma50": true,
+    "live_appended": true
+   },
+   "total_index": {
+    "level": 3563420,
+    "r1": 0.0045,
+    "r5": 0.0146,
+    "r20": 0.1248,
+    "above_sma50": true,
+    "live_appended": true
+   },
+   "regime": "mid",
+   "regime_rule": "hot = شاخص ۴۴ در ۲۰ روز بیش از +۱۰٪؛ cold = کمتر از −۵٪؛ بقیه mid"
+  },
+  "intraday_today": {
+   "first_trade_time": "09:00",
+   "open": 8272,
+   "last": 8549,
+   "vwap": 8395,
+   "last_vs_vwap_pct": 1.83,
+   "ret_first30m_pct": 0.02,
+   "ret_last30m_pct": 0.58,
+   "bars_5m": [
+    [
+     "11:30",
+     8447,
+     8452,
+     8427,
+     8427,
+     70301
+    ],
+    [
+     "11:35",
+     8433,
+     8433,
+     8433,
+     8433,
+     50930
+    ],
+    [
+     "11:40",
+     8432,
+     8467,
+     8432,
+     8467,
+     92316
+    ],
+    [
+     "11:45",
+     8479,
+     8480,
+     8479,
+     8480,
+     36873
+    ],
+    [
+     "11:50",
+     8489,
+     8489,
+     8452,
+     8486,
+     98211
+    ],
+    [
+     "11:55",
+     8483,
+     8500,
+     8483,
+     8500,
+     40185
+    ],
+    [
+     "12:00",
+     8481,
+     8491,
+     8479,
+     8491,
+     56676
+    ],
+    [
+     "12:05",
+     8504,
+     8504,
+     8500,
+     8500,
+     34173
+    ],
+    [
+     "12:10",
+     8531,
+     8532,
+     8495,
+     8495,
+     92313
+    ],
+    [
+     "12:15",
+     8503,
+     8507,
+     8503,
+     8507,
+     47831
+    ],
+    [
+     "12:20",
+     8517,
+     8524,
+     8517,
+     8521,
+     42515
+    ],
+    [
+     "12:25",
+     8540,
+     8549,
+     8540,
+     8549,
+     36601
+    ]
+   ]
+  },
+  "rubric": {
+   "version": 2,
+   "points": {
+    "smart_retail_money": 2,
+    "buyer_power_gt2": 0,
+    "buyer_power_lt05": 0,
+    "buy_queue_close": 0,
+    "sell_queue_close": 0,
+    "strong_finish": 2,
+    "weak_finish": 0,
+    "rsi_below_30": 0,
+    "above_upper_bollinger": 0
+   },
+   "subtotal_without_codal": 4,
+   "band_without_codal": ">=+4",
+   "regime": "mid",
+   "context": {
+    "indiv_outflow_5d_gt10pct": false,
+    "indiv_inflow_today_gt20pct": true,
+    "new_20d_low": false,
+    "new_20d_high_with_volume": false,
+    "adx_downtrend": false,
+    "group_flow_ex_self": -0.086,
+    "strategic_holder_buy_5d": false,
+    "strategic_holder_sell_5d": true,
+    "close_above_last_swing_high": false,
+    "close_below_last_swing_low": false
+   },
+   "calibration_for_this_band": {
+    "n": 441,
+    "p_up_1d": 0.81,
+    "p_up_3d": 0.6,
+    "p_up_5d": 0.58,
+    "p_up_10d": 0.58,
+    "median_5d_pct": 0.5,
+    "avg_gain_5d_pct": 5.2,
+    "avg_loss_5d_pct": -3.1
+   },
+   "base_rate_this_regime": {
+    "p_up_1d": 0.43,
+    "p_up_5d": 0.47,
+    "median_5d_pct": -0.2
+   },
+   "edge_vs_base_5d_pp": 11,
+   "applicable": true,
+   "note": "امتیاز کدال را اضافه کن و باند را دوباره تعیین کن؛ لبه = اختلاف با نرخ پایهٔ همین رژیم",
+   "tradability": "قابل معامله"
+  }
+ },
+ "codal": {
+  "symbol": "نمونه",
+  "window_days": 120,
+  "n_letters": 8,
+  "letters": [
+   {
+    "type": "AGM_DECISION",
+    "title": "تصمیمات مجمع عمومی عادی سالیانه صاحبان سهام برای سال مالی منتهی به ۱۴۰۵/۰۳/۳۱",
+    "published": "1405/07/04 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-agm-2",
+    "tracing": 1000002
+   },
+   {
+    "type": "UTILITY_RATES",
+    "title": "افشای اطلاعات با اهمیت - (نرخ سرویس های جانبی) منتهی به ۱۴۰۵/۰۳/۳۱",
+    "published": "1405/07/02 11:05:40",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-util-4",
+    "tracing": 1000004
+   },
+   {
+    "type": "MONTHLY",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به ۱۴۰۵/۰۶/۳۱",
+    "published": "1405/06/28 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-monthly-9",
+    "tracing": 1000009
+   },
+   {
+    "type": "RUMOR_CLARIFY",
+    "title": "شفاف سازی در خصوص شایعه، خبر یا گزارش منتشر شده",
+    "published": "1405/06/22 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-rumor-15",
+    "tracing": 1000015
+   },
+   {
+    "type": "AGM_NOTICE",
+    "title": "دعوت به مجمع عمومی عادی سالیانه",
+    "published": "1405/06/11 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-notice-26",
+    "tracing": 1000026
+   },
+   {
+    "type": "MONTHLY",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به ۱۴۰۵/۰۵/۳۱",
+    "published": "1405/05/28 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-monthly2-40",
+    "tracing": 1000040
+   },
+   {
+    "type": "INTERIM_FS",
+    "title": "صورت‌های مالی میاندوره‌ای ۳ ماهه منتهی به ۱۴۰۵/۰۳/۳۱ (حسابرسی نشده)",
+    "published": "1405/05/13 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-fs-55",
+    "tracing": 1000055
+   },
+   {
+    "type": "BOARD_CEO_CHANGE",
+    "title": "تغییر مدیر عامل",
+    "published": "1405/04/29 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-ceo-70",
+    "tracing": 1000070
+   }
+  ],
+  "monthly_sales": [
+   {
+    "period": "1405/06/31",
+    "published": "1405/06/28 18:30:12",
+    "groups_million_rial": [
+     [
+      "از ابتدای سال مالی تا پایان ماه قبل",
+      52480000
+     ],
+     [
+      "دوره یک ماهه",
+      11230000
+     ]
+    ]
+   },
+   {
+    "period": "1405/05/31",
+    "published": "1405/05/28 18:30:12",
+    "groups_million_rial": [
+     [
+      "از ابتدای سال مالی تا پایان ماه قبل",
+      41250000
+     ],
+     [
+      "دوره یک ماهه",
+      10120000
+     ]
+    ]
+   }
+  ],
+  "sector_regulatory_10d": [
+   {
+    "symbol": "همتای نمونه",
+    "type": "REGULATORY_COURT",
+    "title": "افشای اطلاعات با اهمیت - (رأی دیوان عدالت اداری در خصوص نرخ خوراک) منتهی به ۱۴۰۵/۰۳/۳۱",
+    "published": "1405/07/03 18:30:12",
+    "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-court-3"
+   }
+  ],
+  "last_seen": {
+   "AGM_DECISION": "1405/07/04 18:30:12",
+   "BOARD_CEO_CHANGE": "1405/04/29 18:30:12",
+   "SHUTDOWN": null,
+   "RUMOR_CLARIFY": "1405/06/22 18:30:12",
+   "HALT": null,
+   "REGULATORY_COURT": null,
+   "UTILITY_RATES": "1405/07/02 11:05:40",
+   "FEED_GAS_PRICE": null,
+   "CAPINC_PROPOSAL": null,
+   "PORTFOLIO_NAV": null
+  }
+ },
+ "letters": [
+  {
+   "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-agm-2",
+   "has_attachment": true,
+   "text": "خلاصه تصمیمات مجمع عمومی عادی سالیانه (ساختگی)مجمع با حضور ۸۲٪ سهامداران تشکیل شد. صورت‌های مالی سال منتهی به ۱۴۰۵/۰۳/۳۱ تصویب شد. سود نقدی هر سهم ۹۵۰ ریال تصویب شد. حسابرس و بازرس قانونی برای یک سال انتخاب شد. روزنامهٔ کثیرالانتشار تعیین شد.پیوست",
+   "title": "تصمیمات مجمع عمومی عادی سالیانه صاحبان سهام برای سال مالی منتهی به ۱۴۰۵/۰۳/۳۱",
+   "type": "AGM_DECISION",
+   "published": "1405/07/04 18:30:12"
+  },
+  {
+   "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-util-4",
+   "has_attachment": false,
+   "text": "این متن ساختگی برای آزمون است. به اطلاع می‌رساند نرخ سرویس‌های جانبی (آب، برق و بخار) برای سال ۱۴۰۵ به‌روز شد و اثر آن بر بهای تمام‌شده حدود ۲ درصد برآورد می‌شود. جزئیات در پیوست آمده است.",
+   "title": "افشای اطلاعات با اهمیت - (نرخ سرویس های جانبی) منتهی به ۱۴۰۵/۰۳/۳۱",
+   "type": "UTILITY_RATES",
+   "published": "1405/07/02 11:05:40"
+  },
+  {
+   "url": "https://www.codal.ir/Reports/Decision.aspx?LetterSerial=mock-rumor-15",
+   "has_attachment": false,
+   "text": "این متن ساختگی برای آزمون است. به اطلاع می‌رساند نرخ سرویس‌های جانبی (آب، برق و بخار) برای سال ۱۴۰۵ به‌روز شد و اثر آن بر بهای تمام‌شده حدود ۲ درصد برآورد می‌شود. جزئیات در پیوست آمده است.",
+   "title": "شفاف سازی در خصوص شایعه، خبر یا گزارش منتشر شده",
+   "type": "RUMOR_CLARIFY",
+   "published": "1405/06/22 18:30:12"
+  }
+ ],
+ "meta": {
+  "position": null,
+  "horizon": null,
+  "risk": null
+ }
+}

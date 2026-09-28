@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دیدبان پتروشیمی</title>
+<meta name="description" content="پنل جمع‌آوری داده از tsetmc و کدال برای عامل تحلیل سهام پتروشیمی">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #f7f8fa; --card: #ffffff; --line: #e1e5ea; --text: #16191d; --muted: #5b6470; --accent: #0f6e66; --accent-ink: #fff; --accent-soft: #e2f2f0; --code: #eef1f4; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #101316; --card: #171b1f; --line: #2a3037; --text: #e8ebef; --muted: #9aa3ae; --accent: #3cc7b5; --accent-ink: #06201d; --accent-soft: #173a36; --code: #20262c; } }
+  :root[data-theme="dark"] { --bg: #101316; --card: #171b1f; --line: #2a3037; --text: #e8ebef; --muted: #9aa3ae; --accent: #3cc7b5; --accent-ink: #06201d; --accent-soft: #173a36; --code: #20262c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Vazirmatn, Tahoma, sans-serif; font-size: 15px; line-height: 1.8; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  header svg { width: 34px; height: 34px; color: var(--accent); flex: none; }
+  h1 { font-size: 28px; margin: 0; line-height: 1.3; }
+  .lead { color: var(--muted); margin: 4px 0 28px; max-width: 70ch; }
+  h2 { font-size: 19px; margin: 36px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .tag { display: inline-block; font-size: 12px; border-radius: 6px; padding: 0 8px; background: var(--accent-soft); color: var(--accent); margin-inline-start: 6px; font-weight: 500; }
+  .card p, .card li { color: var(--muted); font-size: 14px; }
+  .card ol { padding: 0 20px 0 0; margin: 8px 0; list-style: persian; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px; padding: 7px 14px; font: inherit; font-size: 14px; cursor: pointer; text-decoration: none; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+  .bm { cursor: grab; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  code { background: var(--code); border-radius: 5px; padding: 0 5px; font-size: 13px; direction: ltr; unicode-bidi: isolate; }
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .steps .card::before { counter-increment: s; content: counter(s, persian); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; margin-inline-end: 8px; vertical-align: middle; }
+  textarea { width: 100%; min-height: 120px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); color: var(--text); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; direction: ltr; }
+  #view { margin-top: 16px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+  a { color: var(--accent); }
+  .msg { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+    <h1>دیدبان پتروشیمی</h1>
+  </header>
+  <p class="lead">پنلی روی tsetmc.com و codal.ir که داده‌های لازم عامل «دیدبان پتروشیمی» (قیمت، جریان پول، روند، سطوح نمودار، رژیم گروه ۴۴ و اطلاعیه‌های کدال) را با یک کلیک جمع می‌کند و برای Claude آماده می‌کند. نسخهٔ 2.1.0.</p>
+
+  <h2>نصب</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Tampermonkey <span class="tag">پیشنهادی</span></h3>
+      <ol>
+        <li>افزونهٔ <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a> (یا Violentmonkey) را نصب کنید.</li>
+        <li>دکمهٔ زیر را بزنید و «Install» را تأیید کنید.</li>
+        <li>tsetmc.com را باز کنید؛ دکمهٔ «دیدبان» پایین صفحه است.</li>
+      </ol>
+      <p>tsetmc و کدال هر دو از یک تب خوانده می‌شوند و نسخه‌های تازه خودکار نصب می‌شوند.</p>
+      <div class="row"><a class="btn primary" href="https://raw.githubusercontent.com/OWNER/petro-watch/main/docs/petro-watch.user.js">نصب اسکریپت</a></div>
+    </div>
+    <div class="card">
+      <h3>Bookmarklet</h3>
+      <p>بدون افزونه. دکمهٔ زیر را به نوار بوک‌مارک بکشید و روی tsetmc.com یا codal.ir بزنید. در هر سایت فقط دادهٔ همان سایت خوانده می‌شود.</p>
+      <div class="row"><a class="btn bm" href="javascript:(function(){if(window.PetroWatch){PetroWatch.open();return}var s=document.createElement('script');s.src='https://owner.github.io/petro-watch/petro-watch.js?v=2.1.0';document.documentElement.appendChild(s)})()" title="این را به نوار بوک‌مارک بکشید">دیدبان</a></div>
+    </div>
+    <div class="card">
+      <h3>Console مرورگر</h3>
+      <p>اگر دو روش بالا کار نکرد: کد را کپی کنید، روی tsetmc.com کلید <code>F12</code> را بزنید و در تب Console بچسبانید.</p>
+      <div class="row"><button class="btn" id="copy-code">کپی کد</button><span class="msg" id="copy-code-msg"></span></div>
+    </div>
+  </div>
+
+  <h2>روش کار</h2>
+  <div class="steps">
+    <div class="card"><b>گرفتن داده</b><p>در پنل نماد را بنویسید و «گرفتن داده» را بزنید (حدود یک دقیقه).</p></div>
+    <div class="card"><b>کپی برای Claude</b><p>خروجی را با پرامپت عامل به Claude بدهید تا برگهٔ تصمیم بسازد.</p></div>
+    <div class="card"><b>ثبت و کارنامه</b><p>خط JSON پایان برگه را در تب «کارنامه» ذخیره کنید و هر هفته ارزیابی بگیرید.</p></div>
+  </div>
+
+  <h2>پرامپت عامل</h2>
+  <div class="card">
+    <p>متن کامل پرامپت «دیدبان پتروشیمی» (نسخهٔ ۲٫۱). آن را در Project یا System Prompt بگذارید، یا در پنل گزینهٔ «با پرامپت» را روشن کنید.</p>
+    <div class="row"><button class="btn primary" id="copy-prompt">کپی پرامپت</button><a class="btn" href="prompt.md" download="Petro_Agent_Prompt_FA.md">دانلود .md</a><span class="msg" id="copy-prompt-msg"></span></div>
+  </div>
+
+  <h2>نمایشگر خروجی</h2>
+  <div class="card">
+    <p>فایل JSON که از پنل دانلود کرده‌اید (یا خروجی <code>petroSnapshot</code> / <code>codalSnapshot</code>) را اینجا بچسبانید یا انتخاب کنید.</p>
+    <textarea id="json" placeholder='{"tool":"petro-watch", ...}'></textarea>
+    <div class="row"><button class="btn primary" id="show">نمایش</button><label class="btn">انتخاب فایل<input type="file" id="file" accept=".json,application/json" hidden></label>
+      <button class="btn" id="sample">نمونهٔ ساختگی</button><span class="msg" id="view-msg"></span></div>
+    <div id="view"></div>
+  </div>
+
+  <footer>
+    <p>این ابزار داده جمع می‌کند و برای تحلیل آموزشی/پژوهشی است؛ توصیهٔ سرمایه‌گذاری شخصی نیست و مسئولیت تصمیم با معامله‌گر است.</p>
+    <p><a href="https://github.com/OWNER/petro-watch">کد در GitHub</a></p>
+  </footer>
+</div>
+<script src="petro-watch.js?v=2.1.0"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const say = (id, t) => { $(id).textContent = t; setTimeout(() => { $(id).textContent = ''; }, 3000); };
+  async function copy(text) { try { await navigator.clipboard.writeText(text); return true; } catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } }
+  $('copy-prompt').onclick = async () => say('copy-prompt-msg', await copy(PetroWatch.prompt) ? 'کپی شد' : 'کپی نشد');
+  $('copy-code').onclick = async () => { try { const t = await (await fetch('petro-watch.js?v=2.1.0')).text(); say('copy-code-msg', await copy(t) ? 'کپی شد' : 'کپی نشد'); } catch (e) { say('copy-code-msg', 'خطا در خواندن فایل'); } };
+  function show(text) {
+    try { const data = JSON.parse(text); PetroWatch.renderInto($('view'), data); $('view-msg').textContent = ''; $('view').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    catch (e) { $('view-msg').textContent = 'JSON معتبر نیست: ' + e.message; }
+  }
+  $('show').onclick = () => show($('json').value);
+  $('file').onchange = async e => { const f = e.target.files[0]; if (f) { const t = await f.text(); $('json').value = t; show(t); } };
+  $('sample').onclick = async () => { try { const t = await (await fetch('sample.json?v=2.1.0')).text(); $('json').value = t; show(t); } catch (e) { $('view-msg').textContent = 'نمونه پیدا نشد'; } };
+</script>
+</body>
+</html>
