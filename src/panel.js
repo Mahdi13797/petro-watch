@@ -111,6 +111,7 @@ const PetroWatch = (() => {
     if (b.tsetmc && b.tsetmc.error) h += `<div class="err"><b>tsetmc:</b> ${esc(b.tsetmc.error)}</div>`;
     if (b.codal && b.codal.error) h += `<div class="err"><b>کدال:</b> ${esc(b.codal.error)}</div>`;
     if (t) {
+      h += planHtml(t, b.codal);
       h += sumCard(t, b.codal);
       if (t.ipo) h += sec('عرضهٔ اولیه (IPO)', ipoHtml(t.ipo), true);
       h += sec('روند چندافقی', trendHtml(t.trend, t), true);
@@ -145,6 +146,43 @@ const PetroWatch = (() => {
       <div class="chips">${fresh}${st ? `<span class="badge ${stBad ? 'bad' : ''}">${esc(st)}</span>` : ''}${d && d.live_row ? '<span class="badge">ردیف زندهٔ امروز</span>' : ''}
       <span class="muted small">گرفته‌شده: ${tehranTime(b.collected_at || (t && t.generated_at))}</span></div>
       ${warns.length ? `<ul class="warns">${warns.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}</div>`;
+  }
+
+  // ---- simple plan: what to do, at what price, how much (same rules as the daily report)
+  const floor10 = x => Math.floor(x / 10) * 10, ceil10 = x => Math.ceil(x / 10) * 10;
+  function planOf(t, codal) {
+    const d = t.daily || {}, r = t.rubric || {}, st = fixFa((t.instrument && t.instrument.state) || '');
+    const tradable = /^مجاز/.test(st) && !/متوقف|ممنوع/.test(st) && !t.ipo;
+    const ch = codalHints(codal); const score = (r.subtotal_without_codal || 0) + (ch ? ch.pts : 0);
+    const close = d.close, atr = d.atr_pct || 0.03, upper = floor10(close * 1.03);
+    const sup = ((t.chart && t.chart.levels_sorted_high_to_low) || []).filter(x => x[1] < close * 0.998)[0];
+    const res = ((t.chart && t.chart.levels_sorted_high_to_low) || []).filter(x => x[1] > close * 1.002).slice(-1)[0];
+    const holdStop = sup ? floor10(sup[1] * 0.99) : floor10(close * (1 - 1.5 * atr));
+    const p = { tradable, score, close, upper, holdStop, state: st };
+    if (!tradable) return p;
+    if (score >= 4) { // model buy signal
+      const stop = Math.max(holdStop, floor10(close * (1 - 1.5 * atr))), dist = (close - stop) / close;
+      const tgt = res && res[1] - close >= close - stop ? res[1] : close + 2 * (close - stop);
+      p.signal = dist > 0.08 ? null : { side: 'buy', stop, target: Math.round(tgt), size: Math.min(100, 1 / (dist * 100) * 100) };
+    } else if (score <= -4) p.signal = { side: 'sell' };
+    // breakout trigger so a rally isn't missed: above the 20-day high (or today's high if today already broke it)
+    const hi20 = d.donchian20_high, X = ceil10(hi20 && close < hi20 ? hi20 : (d.high || close));
+    const stopX = floor10(X * (1 - 1.5 * atr));
+    p.trigger = { level: X, reachableTomorrow: X <= upper, stop: stopX, target: Math.round(X + 2 * (X - stopX)), size: (1 / (1.5 * atr * 100)) * 100 / 3 };
+    return p;
+  }
+  function planHtml(t, codal) {
+    const p = planOf(t, codal);
+    let h = '<div class="card"><div><b>برنامهٔ ساده</b> <span class="muted small">طبق قاعده‌های مدل؛ ریسک ۱٪ سرمایه در هر معامله</span></div>';
+    if (!p.tradable) return h + `<div class="note warn">نماد قابل معامله نیست (${esc(p.state || 'عرضهٔ اولیه')}). اقدامی نیست.</div></div>`;
+    if (p.signal && p.signal.side === 'buy') h += `<div class="note" style="background:var(--pos-soft);color:var(--pos)"><b>خرید (سیگنال مدل):</b> جلسهٔ بعد از ۱۱:۰۰ تا پایان جلسه، تا قیمت ${num(p.upper)}؛ در صف خرید نخرید. حد ضرر ${num(p.signal.stop)} · هدف ${num(p.signal.target)} · حدود ${num(p.signal.size, 0, '٪')} سرمایه · خروج حداکثر بعد از ۵ جلسه.</div>`;
+    else if (p.signal && p.signal.side === 'sell') h += '<div class="note bad"><b>فروش (سیگنال مدل):</b> اگر دارید، جلسهٔ بعد بعد از ۱۰:۳۰ بفروشید؛ در صف فروش نفروشید.</div>';
+    else h += '<div class="small" style="margin-top:6px">سیگنال خرید یا فروش مدل: <b>ندارد</b>.</div>';
+    const g = p.trigger;
+    h += `<div class="kv" style="margin-top:8px">${kv('اگر ندارید: خرید اگر پایانی بالای', `<b>${num(g.level)}</b>${g.reachableTomorrow ? '' : ' <span class="muted small">(فردا دست‌یافتنی نیست)</span>'}`)}
+      ${kv('مقدار و حد ضرر بعد از این خرید', `${num(g.size, 0, '٪')} سرمایه · حد ضرر ${num(g.stop)}`)}${kv('هدف', num(g.target))}${kv('اگر دارید: حد ضرر', `<b>${num(p.holdStop)}</b>`)}</div>
+      <p class="muted small">ماشهٔ «پایانی بالای» یعنی بین ۱۲:۱۵ و ۱۲:۳۰ قیمت بالای آن عدد باشد؛ سقف ۲۰ روزه در آزمون ۱۳ ساله فقط لبهٔ ضعیف داشت، پس حجمش ⅓ است.</p></div>`;
+    return h;
   }
 
   function sumCard(t, codal) {
