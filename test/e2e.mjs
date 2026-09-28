@@ -83,6 +83,7 @@ try {
     await runSymbol(page, MOCK.SYM);
     const b = await lastResult(page);
     check(b && b.tsetmc && !b.tsetmc.error && b.tsetmc.rubric, 'petroSnapshot ran: ' + (b?.tsetmc?.error || 'rubric ok'));
+    check(b && b.tsetmc && b.tsetmc.group && b.tsetmc.group.n_traded > 0, 'group block filled without MarketWatch `flow` (' + b?.tsetmc?.group?.n_traded + ' symbols)');
     check(b && b.codal && !b.codal.error && b.codal.n_letters === 8, 'codalSnapshot ran from the tsetmc tab: ' + (b?.codal?.error || b?.codal?.n_letters + ' letters'));
     check(b && b.codal.monthly_sales.length === 2, 'monthly sales parsed (' + b?.codal?.monthly_sales?.length + ')');
     check(b && b.codal.sector_regulatory_10d.length === 1, 'sector news found');

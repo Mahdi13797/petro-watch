@@ -354,6 +354,7 @@ P/E در برابر گروه، EPS، حساسیت به نرخ ارز و گاز،
    group flow excluding the symbol itself, live index append after the close, group regime
    (hot / mid / cold) with the regime-conditioned calibration table, AGM/HTML letters.
    v2.1: `trend` block — daily / weekly (completed weeks) / yearly trend, alignment, 60-day regression channel.
+   v2.1.1: group block — MarketWatch no longer returns `flow`; a missing flow no longer drops every symbol.
    ========================================================================== */
 
 async function petroSnapshot(symbol) {
@@ -589,7 +590,7 @@ async function petroSnapshot(symbol) {
 
   // ---------- 9) group (44) breadth, flows EXCLUDING this symbol, index context + live append
   const mw = await J('ClosingPrice/GetMarketWatch?market=0&paperTypes[0]=1&paperTypes[1]=2&showTraded=false&withBestLimits=true');
-  const G = (mw?.marketwatch || []).filter(x => (x.csv || '').trim() === '44' && [1, 2, 4].includes(x.flow) && !/\d$/.test(x.lva) && x.qtc > 0);
+  const G = (mw?.marketwatch || []).filter(x => (x.csv || '').trim() === '44' && (x.flow == null || [1, 2, 4].includes(x.flow)) && !/\d$/.test(x.lva) && x.qtc > 0);
   const cta = await J('ClientType/GetClientTypeAll'); const CTA = {}; (cta?.clientTypeAllDto || []).forEach(x => CTA[x.insCode] = x);
   let netI = 0, tv = 0, selfNet = 0, selfVal = 0;
   G.forEach(x => { const c = CTA[x.insCode]; if (!c) return; const nI = (c.buy_I_Volume - c.sell_I_Volume) * x.pcl; if (x.insCode === ic) { selfNet = nI; selfVal = x.qtc; } else { netI += nI; tv += x.qtc; } });

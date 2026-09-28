@@ -31,7 +31,7 @@ function build() {
   const idx = (base, drift) => { let v = base; return days.map((d, i) => { v *= 1 + drift + 0.009 * gauss(r) + (i > days.length - 20 ? 0.003 : 0); return { dEven: ymd(d), xNivInuClMresIbs: Math.round(v) }; }); };
   const ix44 = idx(900000, 0.0007), ixT = idx(2400000, 0.0006);
   const peers = Array.from({ length: 24 }, (_, k) => { const py = 5000 + Math.round(20000 * r()), ch = 0.03 * (2 * r() - 1);
-    return { insCode: String(900000000 + k), lva: 'همتا' + ['الف', 'ب', 'پ', 'ت', 'ث', 'ج', 'چ', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'ژ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق'][k], csv: '44', flow: 1,
+    return { insCode: String(900000000 + k), lva: 'همتا' + ['الف', 'ب', 'پ', 'ت', 'ث', 'ج', 'چ', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'ژ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق'][k], csv: '44 ',
       qtc: Math.round(2e11 * r()), py, pcl: Math.round(py * (1 + ch)), pdv: Math.round(py * (1 + ch * 1.1)), pMax: Math.round(py * 1.03), pMin: Math.round(py * 0.97), blDs: [{ qmo: 1000, qmd: 1000 }] }; });
   return { days, today, rows, flows, ix44, ixT, peers, r };
 }
@@ -54,7 +54,8 @@ function tsetmc(path) {
     if (i !== rows.length - 3) return { shareShareholder: [] };
     const prev = rows[i - 1].dEven; return { shareShareholder: [{ dEven: prev, shareHolderName: 'BFMصندوق بازارگرداني نمونه', numberOfShares: 180e6 }, { dEven: d, shareHolderName: 'BFMصندوق بازارگرداني نمونه', numberOfShares: 186e6 },
       { dEven: prev, shareHolderName: 'صندوق بازنشستگي نمونه', numberOfShares: 690e6 }, { dEven: d, shareHolderName: 'صندوق بازنشستگي نمونه', numberOfShares: 684e6 }] }; }
-  if (path.startsWith('ClosingPrice/GetMarketWatch')) return { marketwatch: [...peers, { insCode: IC, lva: SYM, csv: '44', flow: 1, qtc: live.qTotCap, py: live.priceYesterday, pcl: live.pClosing, pdv: live.pDrCotVal, pMax: Math.round(live.priceYesterday * 1.03), pMin: Math.round(live.priceYesterday * 0.97), blDs: [{ qmo: 1, qmd: 1 }] }] };
+  // like the live API (1405/07): no `flow` field, csv padded with a space
+  if (path.startsWith('ClosingPrice/GetMarketWatch')) return { marketwatch: [...peers, { insCode: IC, lva: SYM, csv: '44 ', qtc: live.qTotCap, py: live.priceYesterday, pcl: live.pClosing, pdv: live.pDrCotVal, pMax: Math.round(live.priceYesterday * 1.03), pMin: Math.round(live.priceYesterday * 0.97), blDs: [{ qmo: 1, qmd: 1 }] }] };
   if (path.startsWith('ClientType/GetClientTypeAll')) return { clientTypeAllDto: [...peers.map((x, k) => ({ insCode: x.insCode, buy_I_Volume: 1e6 * (1 + (k % 3)), sell_I_Volume: 1e6 * (1 + (k % 4)) })), { insCode: IC, buy_I_Volume: 9e6, sell_I_Volume: 5e6 }] };
   if (path.startsWith('Index/GetIndexB2History/')) { const s = path.endsWith(IX44) ? ix44 : ixT; return { indexB2: s.slice(0, -1).reverse() }; }
   if (path.startsWith('Index/GetIndexB1LastAll/')) return { indexB1: [{ insCode: IX44, xDrNivJIdx004: ix44[ix44.length - 1].xNivInuClMresIbs }, { insCode: IXT, xDrNivJIdx004: ixT[ixT.length - 1].xNivInuClMresIbs }] };
