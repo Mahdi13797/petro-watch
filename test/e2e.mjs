@@ -103,6 +103,8 @@ try {
     await page.setViewportSize({ width: 1400, height: Math.min(h + 200, 12000) });
     await page.screenshot({ path: OUT + '1c-wide-full.png' });
     fs.writeFileSync(new URL('docs/sample.json', root), JSON.stringify(b, null, 1));
+    await page.addScriptTag({ content: plainjs });   // bookmarklet on a page where the userscript already runs
+    check(await page.evaluate(() => document.querySelectorAll('#petro-watch-root').length) === 1, 'no second panel when the userscript is already there');
     check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
     await ctx.close();
   }

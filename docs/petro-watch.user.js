@@ -1083,6 +1083,11 @@ const PetroWatch = (() => {
 
   function toggle(force) {
     if (!sh) mount();
+    if (!sh) { // another copy owns the panel on this page: open that one instead
+      const o = document.getElementById('petro-watch-root'), r = o && o.shadowRoot, p = r && r.querySelector('.panel');
+      if (p && p.hidden !== !(force === undefined ? p.hidden : force)) { const f = r.querySelector('.fab'); if (f) f.click(); }
+      return;
+    }
     const p = sh.querySelector('.panel'), open = force === undefined ? p.hidden : force;
     p.hidden = !open; state.open = open;
     if (open) { renderResult(); autoSymbol(); const i = $('[name="sym"]'); if (i && !i.value) i.focus(); }
@@ -1100,6 +1105,8 @@ const PetroWatch = (() => {
 
   function mount(container) {
     if (sh) return api;
+    // the userscript (or an earlier bookmarklet) already put a panel on this page: don't add a second one
+    if (!container && document.getElementById('petro-watch-root')) return api;
     inline = !!container;
     host = container || document.createElement('div');
     if (!container) { host.id = 'petro-watch-root'; host.style.cssText = 'all:initial'; document.documentElement.appendChild(host); }
