@@ -113,10 +113,10 @@ try {
     await page.goto('https://www.codal.ir/');
     await page.addScriptTag({ content: plainjs });
     await page.waitForTimeout(300);
-    check(!(await shadow(page, 'input[name="t"]').isChecked()), 'tsetmc unchecked on codal in console mode');
+    check(await shadow(page, 'input[name="t"]').isChecked() && await shadow(page, 'input[name="c"]').isChecked(), 'tsetmc and codal both enabled on codal.ir in console mode');
     await runSymbol(page, MOCK.SYM);
     const b = await lastResult(page);
-    check(b && b.codal && b.codal.n_letters === 8 && !b.tsetmc, 'codal-only run works');
+    check(b && b.codal && b.codal.n_letters === 8 && b.tsetmc && b.tsetmc.rubric, 'codal.ir tab reads both sources without an extension');
     check(await page.evaluate(() => typeof window.codalSnapshot === 'function'), 'collector functions exposed on window');
     await shadow(page, '[data-act="letter"]').first().click();
     await page.waitForTimeout(800);
@@ -133,6 +133,7 @@ try {
     await page.addScriptTag({ content: plainjs });
     await runSymbol(page, MOCK.SYM);
     const b = await lastResult(page);
+    check(await shadow(page, 'input[name="c"]').isDisabled(), 'codal disabled on tsetmc without an extension');
     check(b && b.tsetmc && b.tsetmc.rubric && !b.codal, 'tsetmc-only run in console mode');
     await page.screenshot({ path: OUT + '3-tsetmc-console-mobile.png' });
     await shadow(page, '[data-tab="book"]').click();
@@ -155,6 +156,11 @@ try {
     const { ctx, page, errors } = await newPage(browser, { width: 1100 });
     await page.goto('https://owner.github.io/petro-watch/');
     await page.screenshot({ path: OUT + '4-site.png', fullPage: true });
+    await page.locator('#app input[name="sym"]').fill(MOCK.SYM);
+    await page.locator('#app [data-el="go"]').click();
+    await page.waitForFunction(() => /تمام شد/.test(document.querySelector('#app').shadowRoot.querySelector('[data-el="steps"]')?.textContent || ''), null, { timeout: 60000 });
+    check(/امتیاز بدون کدال/.test(await page.locator('#app .sum').innerText()), 'direct run on the Pages site (tsetmc only)');
+    await page.locator('#app').screenshot({ path: OUT + '4a-site-direct.png' });
     await page.click('#sample');
     await page.waitForTimeout(500);
     const vt = await page.locator('#view .sum').innerText().catch(() => '');

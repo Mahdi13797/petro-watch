@@ -484,7 +484,8 @@ return { petroSnapshot, petroEvaluate, codalSnapshot, codalLetterText };
 const PetroWatch = (() => {
   const HOST = location.hostname;
   const SITE = /(^|\.)tsetmc\.com$/.test(HOST) ? 'tsetmc' : /(^|\.)codal\.ir$/.test(HOST) ? 'codal' : 'other';
-  const CAN = { tsetmc: !!PW_GM || SITE === 'tsetmc', codal: !!PW_GM || SITE === 'codal' };
+  // cdn.tsetmc.com answers any origin (CORS *); search.codal.ir only answers codal.ir → codal needs the codal.ir tab or GM
+  const CAN = { tsetmc: true, codal: !!PW_GM || SITE === 'codal' };
 
   // ---------------------------------------------------------------- dictionaries
   const PEERS = ['فارس', 'شپدیس', 'نوری', 'جم', 'پارس', 'تاپیکو', 'پترول', 'شیراز', 'زاگرس', 'مارون', 'آریا', 'شگویا', 'بوعلی', 'کرماشا', 'شخارک', 'شفن', 'تابان', 'وپترو', 'شیران', 'پارسان'];
@@ -847,15 +848,14 @@ const PetroWatch = (() => {
 
   function modeText() {
     if (PW_GM) return 'حالت Tampermonkey: tsetmc و کدال هر دو از همین تب خوانده می‌شوند.';
-    if (SITE === 'tsetmc') return 'حالت بدون افزونه: در این تب فقط tsetmc خوانده می‌شود. برای کدال، پنل را در تب codal.ir هم باز کنید (یا نسخهٔ Tampermonkey را نصب کنید).';
-    if (SITE === 'codal') return 'حالت بدون افزونه: در این تب فقط کدال خوانده می‌شود. برای قیمت و جریان پول، پنل را در تب tsetmc.com باز کنید.';
-    return 'این صفحه نه tsetmc است نه کدال؛ اجرای مستقیم فقط اگر آن سایت‌ها اجازه دهند (CORS) کار می‌کند.';
+    if (SITE === 'codal') return 'حالت بدون افزونه روی codal.ir: tsetmc و کدال هر دو از همین تب خوانده می‌شوند.';
+    if (SITE === 'tsetmc') return 'حالت بدون افزونه روی tsetmc: فقط tsetmc خوانده می‌شود. برای کدال هم، پنل را روی codal.ir باز کنید یا نسخهٔ Tampermonkey را نصب کنید.';
+    return 'در این صفحه فقط tsetmc خوانده می‌شود. کدال فقط روی codal.ir (Bookmarklet) یا با Tampermonkey.';
   }
 
   function shell() {
     const recent = store.get('recent', []);
-    const opts = store.get('opts', { t: CAN.tsetmc, c: CAN.codal, days: 120, letters: true, prompt: false });
-    if (!CAN.tsetmc && SITE !== 'other') opts.t = false; if (!CAN.codal && SITE !== 'other') opts.c = false;
+    const opts = { days: 120, letters: true, prompt: false, ...store.get('opts', {}), t: true, c: CAN.codal };
     return `<style>${PW_CSS}</style><div class="pw${inline ? ' inline' : ''}" dir="rtl" lang="fa">
       ${inline ? '' : `<button class="fab" data-act="toggle" title="دیدبان پتروشیمی (Alt+P)">${ICON.logo}<span>دیدبان</span></button>`}
       <section class="panel${store.get('wide', false) ? ' wide' : ''}" role="dialog" aria-label="دیدبان پتروشیمی" ${inline ? '' : 'hidden'}>
@@ -867,7 +867,7 @@ const PetroWatch = (() => {
             <form class="row symrow" data-form="run" autocomplete="off"><input class="inp" name="sym" list="pw-peers" placeholder="نماد، مثلاً شپدیس" value="${esc(store.get('sym', ''))}" required>
               <datalist id="pw-peers">${[...new Set([...recent, ...PEERS])].map(p => `<option value="${esc(p)}">`).join('')}</datalist>
               <button class="btn primary" type="submit" data-el="go">گرفتن داده</button></form>
-            <div class="opts"><label><input type="checkbox" name="t" ${opts.t ? 'checked' : ''}> tsetmc</label><label><input type="checkbox" name="c" ${opts.c ? 'checked' : ''}> کدال</label>
+            <div class="opts"><label><input type="checkbox" name="t" ${opts.t ? 'checked' : ''}> tsetmc</label><label><input type="checkbox" name="c" ${opts.c ? 'checked' : ''} ${CAN.codal ? '' : 'disabled'}> کدال</label>
               <label>روزهای کدال <input class="inp" type="number" name="days" min="10" max="365" value="${esc(opts.days)}"></label>
               <label><input type="checkbox" name="letters" ${opts.letters ? 'checked' : ''}> متن ۳ اطلاعیهٔ مهم</label></div>
             <details class="more"><summary>جزئیات برای Claude (اختیاری)</summary><div class="opts">
@@ -920,7 +920,6 @@ const PetroWatch = (() => {
       <div class="row" style="margin-top:6px"><button class="btn primary" data-act="book-add">افزودن به دفتر</button><button class="btn" data-act="book-eval" ${book.length ? '' : 'disabled'}>ارزیابی همه</button>
         <button class="btn" data-act="book-copy" ${book.length ? '' : 'disabled'}>کپی کارنامه برای Claude</button><button class="btn" data-act="book-dl" ${book.length ? '' : 'disabled'}>دانلود</button>
         <button class="btn danger" data-act="book-clear" ${book.length ? '' : 'disabled'}>پاک کردن دفتر</button></div>
-      ${CAN.tsetmc ? '' : '<div class="note warn">ارزیابی به tsetmc نیاز دارد: پنل را در تب tsetmc.com باز کنید یا نسخهٔ Tampermonkey را نصب کنید.</div>'}
       <div class="book-sum">${box('درستی ۱ روزه', s1)}${box('درستی ۵ روزه', s5)}${box('درستی ۲۰ روزه', s20)}</div>
       ${book.length ? `<table><thead><tr><th>تاریخ</th><th>نماد</th><th>تصمیم</th><th>قیمت مرجع</th><th>۱ روز</th><th>۵ روز</th><th>۲۰ روز</th><th>درست (۵ روز)</th><th></th></tr></thead><tbody>
       ${rows.map(({ o, r }, i) => `<tr><td>${esc(faDigits(o.date))}</td><td>${esc(o.symbol)}</td><td class="small">${esc(o.decision)}</td><td>${num(o.ref_price)}</td>
@@ -936,7 +935,7 @@ const PetroWatch = (() => {
       <li>«کپی برای Claude» را بزنید و در گفت‌وگو با Claude بچسبانید. اگر پرامپت عامل را در Project یا System Prompt نگذاشته‌اید، گزینهٔ «با پرامپت» را روشن کنید.</li>
       <li>خط JSON پایان برگه را در تب «کارنامه» ذخیره کنید و هر هفته «ارزیابی همه» را بزنید.</li></ol>
       <div class="row"><button class="btn primary" data-act="copy-prompt">کپی پرامپت عامل</button><button class="btn" data-act="dl-prompt">دانلود پرامپت (.md)</button></div>
-      <h4>برای عامل مرورگری</h4><p class="small">اگر Claude خودش مرورگر دارد، تابع‌های اصلی در همین صفحه هم در دسترس‌اند: <code>petroSnapshot('نماد')</code>، <code>codalSnapshot('نماد', 120)</code>، <code>codalLetterText(url)</code>، <code>petroEvaluate([...])</code> (در حالت بدون افزونه).</p>
+      <h4>برای عامل مرورگری</h4><p class="small">اگر Claude خودش مرورگر دارد، در حالت بدون افزونه تابع‌های اصلی در همین صفحه هم در دسترس‌اند: <code>petroSnapshot('نماد')</code>، <code>codalSnapshot('نماد', 120)</code>، <code>codalLetterText(url)</code>، <code>petroEvaluate([...])</code>. روی codal.ir هر چهار تابع کار می‌کنند.</p>
       <h4>حالت اجرا</h4><p class="small">${esc(modeText())}</p>
       <p class="small">میان‌بر: <code>Alt+P</code> باز و بسته کردن پنل.</p>
       <p class="small"><a href="${esc(PW_REPO)}" target="_blank" rel="noopener">مخزن GitHub</a> · <a href="${esc(PW_PAGES)}" target="_blank" rel="noopener">صفحهٔ نصب و نمایشگر</a></p>
@@ -953,9 +952,9 @@ const PetroWatch = (() => {
   function readOpts() {
     const f = $('[data-pane="run"]');
     const g = n => f.querySelector(`[name="${n}"]`);
-    const o = { t: g('t').checked, c: g('c').checked, days: Math.max(10, Math.min(365, +g('days').value || 120)), letters: g('letters').checked, prompt: store.get('opts', {}).prompt || false };
+    const o = { days: Math.max(10, Math.min(365, +g('days').value || 120)), letters: g('letters').checked, prompt: store.get('opts', {}).prompt || false };
     store.set('opts', o);
-    return { ...o, position: g('position').value, horizon: g('horizon').value, risk: g('risk').value };
+    return { ...o, t: g('t').checked, c: g('c').checked && CAN.codal, position: g('position').value, horizon: g('horizon').value, risk: g('risk').value };
   }
 
   async function run(symRaw) {
@@ -1036,7 +1035,6 @@ const PetroWatch = (() => {
       state.book = []; state.evalRes = {}; store.set('book', []); store.set('evalRes', {}); return renderBook();
     }
     if (act === 'book-eval') {
-      if (!CAN.tsetmc && SITE !== 'other') return toast('ارزیابی فقط در تب tsetmc یا با Tampermonkey');
       el.disabled = true; el.textContent = 'در حال ارزیابی…';
       const res = await safe(() => PC.petroEvaluate(state.book.map(o => ({ ...o }))));
       if (res && res.error) { toast('خطا: ' + res.error); } else { res.forEach(r => { state.evalRes[keyOf(r)] = r; }); store.set('evalRes', state.evalRes); toast('ارزیابی شد'); }

@@ -4,17 +4,20 @@
 
 اسکریپت جمع‌آوری (`src/petro_collector.js`، نسخهٔ ۲٫۱) بدون تغییر استفاده شده؛ پنل فقط روی آن سوار است.
 
-## نصب
+## نصب و اجرا
 
 | روش | چه می‌گیرد | نصب |
 |---|---|---|
-| **Tampermonkey** (پیشنهادی) | tsetmc و کدال، هر دو از یک تب | افزونهٔ Tampermonkey یا Violentmonkey را نصب کنید و فایل [`docs/petro-watch.user.js`](docs/petro-watch.user.js) را باز کنید (Raw) تا «Install» بیاید |
-| Bookmarklet | فقط دادهٔ همان سایت | از صفحهٔ GitHub Pages مخزن، دکمهٔ «دیدبان» را به نوار بوک‌مارک بکشید |
-| Console | فقط دادهٔ همان سایت | محتوای [`docs/petro-watch.js`](docs/petro-watch.js) را در Console مرورگر (F12) روی tsetmc.com بچسبانید |
+| **Tampermonkey** (پیشنهادی) | tsetmc و کدال، از هر دو سایت | افزونهٔ Tampermonkey یا Violentmonkey را نصب کنید و فایل [`docs/petro-watch.user.js`](docs/petro-watch.user.js) را باز کنید (Raw) تا «Install» بیاید |
+| Bookmarklet | روی codal.ir هر دو؛ روی tsetmc فقط tsetmc | از صفحهٔ GitHub Pages مخزن، دکمهٔ «دیدبان» را به نوار بوک‌مارک بکشید |
+| صفحهٔ GitHub Pages | فقط tsetmc | نماد را در بخش «اجرای مستقیم» بدهید |
+| Console | مثل Bookmarklet | محتوای [`docs/petro-watch.js`](docs/petro-watch.js) را در Console مرورگر (F12) روی codal.ir بچسبانید |
+
+چرا این تفاوت: API قیمت tsetmc (`cdn.tsetmc.com`) به هر سایتی جواب می‌دهد، ولی جست‌وجوی کدال (`search.codal.ir`) فقط به خود codal.ir. Tampermonkey این محدودیت را با `GM_xmlhttpRequest` دور می‌زند.
 
 ## روش کار
 
-1. روی tsetmc.com دکمهٔ **دیدبان** (پایین صفحه، یا `Alt+P`) را بزنید، نماد را بنویسید و **گرفتن داده** را بزنید.
+1. روی codal.ir یا tsetmc.com دکمهٔ **دیدبان** (پایین صفحه، یا `Alt+P`) را بزنید، نماد را بنویسید و **گرفتن داده** را بزنید.
 2. **کپی برای Claude** را بزنید و در گفت‌وگو بچسبانید. اگر پرامپت عامل را در Project یا System Prompt نگذاشته‌اید، گزینهٔ «با پرامپت» را روشن کنید.
 3. خط JSON پایان برگه را در تب **کارنامه** ذخیره کنید و هر هفته **ارزیابی همه** را بزنید (افق ۵ روز).
 

@@ -50,7 +50,11 @@
   </header>
   <p class="lead">پنلی روی tsetmc.com و codal.ir که داده‌های لازم عامل «دیدبان پتروشیمی» (قیمت، جریان پول، روند، سطوح نمودار، رژیم گروه ۴۴ و اطلاعیه‌های کدال) را با یک کلیک جمع می‌کند و برای Claude آماده می‌کند. نسخهٔ 2.1.0.</p>
 
-  <h2>نصب</h2>
+  <h2>اجرای مستقیم</h2>
+  <p class="muted">همین‌جا نماد را بدهید تا دادهٔ tsetmc (قیمت، جریان پول، روند، سطوح، رژیم و امتیاز) گرفته شود. کدال فقط از داخل codal.ir خوانده می‌شود؛ برای آن از Bookmarklet یا Tampermonkey استفاده کنید.</p>
+  <div id="app"></div>
+
+  <h2>نصب روی tsetmc و کدال</h2>
   <div class="grid">
     <div class="card">
       <h3>Tampermonkey <span class="tag">پیشنهادی</span></h3>
@@ -64,19 +68,19 @@
     </div>
     <div class="card">
       <h3>Bookmarklet</h3>
-      <p>بدون افزونه. دکمهٔ زیر را به نوار بوک‌مارک بکشید و روی tsetmc.com یا codal.ir بزنید. در هر سایت فقط دادهٔ همان سایت خوانده می‌شود.</p>
+      <p>بدون افزونه. دکمهٔ زیر را به نوار بوک‌مارک بکشید. <b>روی codal.ir</b> بزنید تا tsetmc و کدال هر دو خوانده شوند (روی tsetmc فقط tsetmc).</p>
       <div class="row"><a class="btn bm" href="javascript:(function(){if(window.PetroWatch){PetroWatch.open();return}var s=document.createElement('script');s.src='https://owner.github.io/petro-watch/petro-watch.js?v=2.1.0';document.documentElement.appendChild(s)})()" title="این را به نوار بوک‌مارک بکشید">دیدبان</a></div>
     </div>
     <div class="card">
       <h3>Console مرورگر</h3>
-      <p>اگر دو روش بالا کار نکرد: کد را کپی کنید، روی tsetmc.com کلید <code>F12</code> را بزنید و در تب Console بچسبانید.</p>
+      <p>اگر دو روش دیگر کار نکرد: کد را کپی کنید، روی codal.ir کلید <code>F12</code> را بزنید و در تب Console بچسبانید.</p>
       <div class="row"><button class="btn" id="copy-code">کپی کد</button><span class="msg" id="copy-code-msg"></span></div>
     </div>
   </div>
 
   <h2>روش کار</h2>
   <div class="steps">
-    <div class="card"><b>گرفتن داده</b><p>در پنل نماد را بنویسید و «گرفتن داده» را بزنید (حدود یک دقیقه).</p></div>
+    <div class="card"><b>گرفتن داده</b><p>در پنل (روی codal.ir یا tsetmc، یا همین صفحه) نماد را بنویسید و «گرفتن داده» را بزنید.</p></div>
     <div class="card"><b>کپی برای Claude</b><p>خروجی را با پرامپت عامل به Claude بدهید تا برگهٔ تصمیم بسازد.</p></div>
     <div class="card"><b>ثبت و کارنامه</b><p>خط JSON پایان برگه را در تب «کارنامه» ذخیره کنید و هر هفته ارزیابی بگیرید.</p></div>
   </div>
@@ -106,6 +110,7 @@
   const $ = id => document.getElementById(id);
   const say = (id, t) => { $(id).textContent = t; setTimeout(() => { $(id).textContent = ''; }, 3000); };
   async function copy(text) { try { await navigator.clipboard.writeText(text); return true; } catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } }
+  PetroWatch.mount($('app'));
   $('copy-prompt').onclick = async () => say('copy-prompt-msg', await copy(PetroWatch.prompt) ? 'کپی شد' : 'کپی نشد');
   $('copy-code').onclick = async () => { try { const t = await (await fetch('petro-watch.js?v=2.1.0')).text(); say('copy-code-msg', await copy(t) ? 'کپی شد' : 'کپی نشد'); } catch (e) { say('copy-code-msg', 'خطا در خواندن فایل'); } };
   function show(text) {
