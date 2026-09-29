@@ -59,6 +59,19 @@ function tsetmc(path) {
   if (path.startsWith('ClientType/GetClientTypeAll')) return { clientTypeAllDto: [...peers.map((x, k) => ({ insCode: x.insCode, buy_I_Volume: 1e6 * (1 + (k % 3)), sell_I_Volume: 1e6 * (1 + (k % 4)) })), { insCode: IC, buy_I_Volume: 9e6, sell_I_Volume: 5e6 }] };
   if (path.startsWith('Index/GetIndexB2History/')) { const s = path.endsWith(IX44) ? ix44 : ixT; return { indexB2: s.slice(0, -1).reverse() }; }
   if (path.startsWith('Index/GetIndexB1LastAll/')) return { indexB1: [{ insCode: IX44, lVal30: '44-شيميايي', xDrNivJIdx004: ix44[ix44.length - 1].xNivInuClMresIbs }, { insCode: IXT, lVal30: 'شاخص كل', xDrNivJIdx004: ixT[ixT.length - 1].xNivInuClMresIbs }] };
+  // v2.4: the day's real price limits, Codal list from tsetmc, one day's row, a past day's trades
+  if (path.startsWith('MarketData/GetStaticThreshold/')) { const d = +path.split('/').pop(), x = rows.find(r => r.dEven === d); if (!x) return { staticThreshold: [] };
+    return { staticThreshold: [{ insCode: '0', dEven: d, hEven: 60130, psGelStaMax: Math.round(x.priceYesterday * 1.03), psGelStaMin: Math.round(x.priceYesterday * 0.97) }] }; }
+  if (path.startsWith('ClosingPrice/GetClosingPriceDaily/')) { const d = +path.split('/').pop(), x = rows.find(r => r.dEven === d); return x ? { closingPriceDaily: x } : { closingPriceDaily: null }; }
+  if (path.startsWith('Codal/GetPreparedDataByInsCode/')) { const iso = (k, hm) => { const dd = new Date(today.getTime() - k * 864e5); return dd.toISOString().slice(0, 10) + 'T' + hm + ':00'; };
+    return { preparedData: [
+      { publishDateTime_Gregorian: iso(0, '16:10'), title: 'پیشنهاد هیئت مدیره به مجمع عمومی فوق العاده در خصوص افزایش سرمایه', tracingNo: 9001 },
+      { publishDateTime_Gregorian: iso(2, '18:30'), title: 'تصمیمات مجمع عمومی عادی سالیانه صاحبان سهام', tracingNo: 9002 },
+      { publishDateTime_Gregorian: iso(9, '18:30'), title: 'گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به ۱۴۰۵/۰۶/۳۱', tracingNo: 9003 },
+      { publishDateTime_Gregorian: iso(30, '10:05'), title: 'اطلاعات و صورت‌های مالی میاندوره‌ای دوره ۳ ماهه (حسابرسی نشده)', tracingNo: 9004 }] }; }
+  if (path.startsWith('Trade/GetTradeHistory/')) { const r = rng(9), tr = []; const d = +path.split('/')[3], x = rows.find(q => q.dEven === d) || live; let px = x.priceYesterday, n = 1;
+    for (let m = 0; m < 210; m += 3) { px = Math.round(px * (1 + 0.002 * gauss(r))); tr.push({ nTran: n++, hEven: (9 + Math.floor(m / 60)) * 10000 + (m % 60) * 100 + 5, pTran: px, qTitTran: 3000 + Math.round(2000 * r()), canceled: 0 }); }
+    return { tradeHistory: tr }; }
   if (path.startsWith('Trade/GetTrade/')) { const r = rng(7), tr = []; let px = live.priceYesterday, n = 1;
     for (let m = 0; m < 210; m += 2) { px = Math.round(px * (1 + 0.002 * gauss(r) + 0.0002)); const hh = 9 + Math.floor(m / 60), mm = m % 60; tr.push({ nTran: n++, hEven: hh * 10000 + mm * 100 + 5, pTran: px, qTitTran: Math.round(5000 + 40000 * r()), canceled: 0 }); }
     return { trade: tr }; }

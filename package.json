@@ -1,6 +1,6 @@
 {
   "name": "petro-watch",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "description": "دیدبان پتروشیمی — پنل جمع‌آوری داده از tsetmc و کدال برای عامل تحلیل سهام پتروشیمی",
   "type": "module",

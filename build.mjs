@@ -18,7 +18,15 @@ const chart = read('src/chart.js');
 const report = read('src/report.js');
 const panel = read('src/panel.js');
 const css = read('src/panel.css');
-const prompt = read('prompt/Petro_Agent_Prompt_FA_v2_3.md');
+// the prompt carries the collector code in its appendix; keep that block identical to src/petro_collector.js
+const PROMPT_FILE = 'prompt/Petro_Agent_Prompt_FA_v2_4.md';
+let prompt = read(PROMPT_FILE);
+{
+  const head = '## ۹. پیوست ب', i = prompt.indexOf(head), a = prompt.indexOf('```javascript\n', i), b = prompt.indexOf('\n```', a + 14);
+  if (i < 0 || a < 0 || b < 0) throw new Error('prompt: code appendix not found');
+  const synced = prompt.slice(0, a + 14) + collector.replace(/\n+$/, '') + prompt.slice(b);
+  if (synced !== prompt) { prompt = synced; write(PROMPT_FILE, prompt); }
+}
 
 const body = `(function () {
 const PW_VERSION = ${JSON.stringify(version)};

@@ -239,6 +239,36 @@ try {
     }
     check(errors.length === 0, 'no page errors while collecting' + (errors.length ? ': ' + errors.join(' | ') : ''));
   }
+
+  // ---------------------------------------------------------------- 6) replay test (v2.4): as-of snapshot, outcome, blind copy, range
+  console.log('6) replay test: petroReplay / petroReplayRange and the panel date field');
+  {
+    const { ctx, page, errors } = await newPage(browser, { width: 1200 });
+    await page.goto('https://www.tsetmc.com/');
+    await page.addScriptTag({ content: plainjs });
+    const back = []; for (let i = 1; back.length < 14; i++) { const d = new Date(MOCK.today.getTime() - i * 864e5); if (![4, 5].includes(d.getUTCDay())) back.push(d); }
+    const asof = MOCK.jal(back[10], true), asofL = MOCK.jal(back[10], false);   // Persian digits in the field on purpose
+    await shadow(page, 'input[name="sym"]').fill(MOCK.SYM);
+    await shadow(page, 'input[name="asof"]').fill(asof);
+    await shadow(page, '[data-el="go"]').click();
+    await page.waitForFunction(() => /تمام شد/.test(document.querySelector('#petro-watch-root').shadowRoot.querySelector('[data-el="steps"]')?.textContent || ''), null, { timeout: 90000 });
+    const b = await lastResult(page);
+    check(b && b.replay && b.replay.outcome && b.replay.check, 'replay run filled outcome and check');
+    check(b && b.tsetmc && b.tsetmc.replay && b.tsetmc.replay.session_used === asofL && b.tsetmc.daily && String(b.tsetmc.daily.date) !== String(b.tsetmc.replay.next_session_dEven), 'snapshot cut at the test date (' + (b?.tsetmc?.replay?.session_used) + ')');
+    const tk = b && b.tsetmc && b.tsetmc.technical;
+    check(tk && tk.ohlc_daily[tk.ohlc_daily.length - 1][0] === b.tsetmc.replay.session_used_dEven, 'no bar after the test date in the chart data');
+    check(b && b.tsetmc.next_session && ['UP', 'DOWN', 'NONE'].includes(b.tsetmc.next_session.call) && b.tsetmc.next_session.prob, 'next_session block present');
+    check(b && b.tsetmc.codal_recent && Array.isArray(b.tsetmc.codal_recent.letters), 'Codal list from tsetmc present');
+    const txt = await shadow(page, '[data-el="result"]').innerText();
+    check(/آزمون گذشته/.test(txt) && /جلسهٔ بعد/.test(txt), 'replay and next-session cards rendered');
+    check(b && !('outcome' in b.tsetmc) && !JSON.stringify(b.tsetmc).includes('next_close_pct'), 'the snapshot given to Claude carries no outcome (blind test)');
+    await shadow(page, '.card details.sec').first().evaluate(d => { d.open = true; });
+    await page.screenshot({ path: OUT + '6-replay.png' });
+    const r = await page.evaluate(async ([s, a]) => { const x = await window.petroReplayRange(s, a, a.replace(/\d+$/, m => m), { max: 3 }); return x; }, [MOCK.SYM, asofL]);
+    check(r && r.rows && r.rows.length >= 1 && r.summary, 'petroReplayRange returns rows and a summary (' + (r?.rows?.length) + ')');
+    check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+    await ctx.close();
+  }
 } finally { await browser.close(); }
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nall passed');
 process.exit(fails.length ? 1 : 0);

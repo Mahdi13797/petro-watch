@@ -1,13 +1,13 @@
 {
  "tool": "petro-watch",
- "version": "2.3.0",
+ "version": "2.4.0",
  "symbol": "نمونه",
- "collected_at": "2026-09-29T15:43:24.264Z",
+ "collected_at": "2026-09-29T20:25:07.902Z",
  "codal_days": 120,
  "tsetmc": {
   "symbol": "نمونه",
-  "version": 2,
-  "generated_at": "2026-09-29T15:43:24.279Z",
+  "version": 2.4,
+  "generated_at": "2026-09-29T20:25:07.916Z",
   "warnings": [],
   "instrument": {
    "insCode": "1234567890123456",
@@ -66,10 +66,15 @@
      0.88
     ]
    ],
+   "price_limits_pct": [
+    -0.03,
+    0.03
+   ],
    "closed_at_upper_limit": false,
    "closed_at_lower_limit": false,
    "trend_class": "strong_up",
    "buy_queue_streak_before_today": 0,
+   "sell_queue_streak_before_today": 0,
    "up_day_streak_before_today": 3
   },
   "chart": {
@@ -3847,6 +3852,7 @@
    "sector_code": "44",
    "sector_name": "محصولات شيميايي",
    "group_index_name": "44-شيميايي",
+   "group_index_code": "33626672012415176",
    "n_traded": 25,
    "pct_up": 0.8,
    "buy_queues": 0,
@@ -4039,6 +4045,73 @@
    "calibration_applies_to_this_group": true,
    "note": "امتیاز کدال را اضافه کن و باند را دوباره تعیین کن؛ لبه = اختلاف با نرخ پایهٔ همین رژیم",
    "tradability": "قابل معامله"
+  },
+  "codal_recent": {
+   "source": "فهرست کدال در tsetmc",
+   "letters": [
+    [
+     "2026-09-29 16:10",
+     "CAPINC_PROPOSAL",
+     "پیشنهاد هیئت مدیره به مجمع عمومی فوق العاده در خصوص افزایش سرمایه"
+    ],
+    [
+     "2026-09-27 18:30",
+     "AGM_DECISION",
+     "تصمیمات مجمع عمومی عادی سالیانه صاحبان سهام"
+    ],
+    [
+     "2026-09-20 18:30",
+     "MONTHLY",
+     "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به ۱۴۰۵/۰۶/۳۱"
+    ],
+    [
+     "2026-08-30 10:05",
+     "INTERIM_FS",
+     "اطلاعات و صورت‌های مالی میاندوره‌ای دوره ۳ ماهه (حسابرسی نشده)"
+    ]
+   ],
+   "v24_rows": {
+    "capinc_night": true,
+    "interim_today": false
+   },
+   "note": "زمان‌ها به وقت تهران. «بعد از جلسه» یعنی بعد از ۱۲:۳۰ روز آخر و قبل از بازگشایی بعدی."
+  },
+  "next_session": {
+   "version": "2.4",
+   "applies": false,
+   "situation": "D",
+   "calibrated_on": "۱۱ نماد پالایشی گروه ۲۳، ۱۳۹۲ تا ۱۴۰۵ (حدود ۲۹ هزار روز-نماد)",
+   "points": {
+    "strong": 3,
+    "smart": 2,
+    "capinc_night": 1
+   },
+   "score": 6,
+   "band": ">=+6",
+   "call": "UP",
+   "prob": {
+    "up": 0.84,
+    "flat": 0.09,
+    "down": 0.07,
+    "up_any": 0.9
+   },
+   "n": 2662,
+   "expected": {
+    "next_close_median_pct": 2.94,
+    "open_gap_median_pct": 2.99,
+    "next_buy_queue_pct": 61,
+    "next_sell_queue_pct": 3,
+    "from_last_price_to_next_close_median_pct": -0.14,
+    "from_last_price_to_5d_median_pct": 1.05,
+    "up_in_5d_pct": 80,
+    "five_day_median_pct": 6.38,
+    "round_trip_cost_pct": 1.25
+   },
+   "can_buy_now": true,
+   "can_sell_now": true,
+   "confidence_flags": [],
+   "walk_forward": "آزمون خارج از نمونه (هر سال فقط با سال‌های قبل): وقتی پیش‌بینی جهت داد و حرکت بی‌حرکت نبود، ۸۱ تا ۸۵٪ درست بود؛ خلاف جهت ۱۰ تا ۱۵٪؛ بی‌حرکت ۶ تا ۳۸٪ (۱۴۰۳ تا ۱۴۰۵)",
+   "note": "این جدول روی پالایشی‌ها برآورد شده؛ برای این گروه آزموده نشده. برای جلسهٔ بعد از rubric.calibration_for_this_band.p_up_1d استفاده کن."
   }
  },
  "codal": {

@@ -110,8 +110,10 @@ const PetroWatch = (() => {
     let h = headCard(b, t);
     if (b.tsetmc && b.tsetmc.error) h += `<div class="err"><b>tsetmc:</b> ${esc(b.tsetmc.error)}</div>`;
     if (b.codal && b.codal.error) h += `<div class="err"><b>کدال:</b> ${esc(b.codal.error)}</div>`;
+    if (b.replay) h += replayCard(b);
     if (t) {
       h += planHtml(t, b.codal);
+      h += nextCard(t);
       h += sumCard(t, b.codal);
       h += sec('نمودار تکنیکال', PWChart.html(), true);
       h += sec('ابزارهای تکنیکال و اعتبار ۱۳ سالهٔ آن‌ها', techHtml(t), true);
@@ -132,10 +134,55 @@ const PetroWatch = (() => {
     return wrapTables(h);
   }
 
+  // ---- v2.4: next-session forecast (refiners) and the replay test
+  const CALL_FA = { UP: 'بالا', DOWN: 'پایین', NONE: 'بدون پیش‌بینی جهت', FLAT: 'بی‌حرکت' };
+  const NS_PTS_FA = { strong: 'پایان قوی', weak: 'پایان ضعیف', buyq: 'صف خرید', sellq: 'صف فروش', smart: 'پول هوشمند', buyq_lowvol: 'صف خرید کم‌حجم', buyq_run2: 'صف خرید روز سوم به بعد',
+    sellq_lowvol: 'صف فروش کم‌حجم', sellq_run2: 'صف فروش روز سوم به بعد', rsi30: 'RSI < ۳۰', boll: 'بالای Bollinger', bp05: 'قدرت خریدار < ۰٫۵', grp_buyq50: 'نیمی از پالایشی‌ها در صف خرید',
+    grp_sellq50: 'نیمی از پالایشی‌ها در صف فروش', total_dn1: 'افت شاخص کل بیش از ۱٪', drop_noq: 'افت بیش از ۲٪ بدون صف', vol_low: 'حجم کمتر از نصف معمول', wide_range: 'دامنهٔ ۶٪ یا بیشتر',
+    capinc_night: 'اطلاعیهٔ افزایش سرمایه بعد از جلسه', interim_today: 'صورت مالی میاندوره‌ای امروز' };
+  const REASON_FA = { GROUP_MOVE: 'کل پالایشی‌ها خلاف جهت رفتند', MARKET_MOVE: 'شاخص کل خلاف جهت رفت', GAP: 'گپ بازگشایی خلاف جهت', QUEUE_FLIP: 'صف امروز فردا شکست',
+    RANGE_CHANGE: 'دامنهٔ نوسان عوض شد', LONG_BREAK: 'فاصلهٔ طولانی تا جلسهٔ بعد', NEWS: 'اطلاعیهٔ کدال بعد از جلسه', ADJUSTMENT: 'تعدیل قیمت', SMALL_MOVE: 'حرکت کمتر از ±۰٫۵٪', OWN: 'حرکت خود سهم' };
+  function nextCard(t) {
+    const ns = t.next_session; if (!ns) return '';
+    const e = ns.expected || {}, p = ns.prob || {};
+    const bar = (l, v, cls) => `<div class="pb"><span>${l}</span><span class="track"><span class="fill ${cls}" style="width:${isNum(v) ? v * 100 : 0}%"></span></span><span class="pv">${P(v)}</span></div>`;
+    const pts = Object.entries(ns.points || {});
+    let h = `<div class="card"><div><b>جلسهٔ بعد</b> <span class="muted small">نسخهٔ ۲٫۴ · ${esc(ns.calibrated_on || '')}</span></div>`;
+    if (!ns.applies) h += `<div class="note warn">${esc(ns.note || '')}</div>`;
+    h += `<div class="score"><div class="sc-num">${sgn(ns.score, 0)}</div><div><div>پیش‌بینی: <b>${esc(CALL_FA[ns.call] || '—')}</b> · ناحیهٔ <b class="n">${esc(ns.band)}</b> <span class="muted small">(n = ${nf(ns.n)})</span></div>
+      <div class="muted small">${pts.length ? pts.map(([k, v]) => `${NS_PTS_FA[k] || k} <span class="n">${ptxt(v)}</span>`).join(' · ') : 'هیچ ردیفی فعال نیست'}</div></div></div>
+      <div class="probs ns">${bar('بالا (بیش از +۰٫۵٪)', p.up, '')}${bar('بی‌حرکت (±۰٫۵٪)', p.flat, 'flat')}${bar('پایین (کمتر از −۰٫۵٪)', p.down, 'neg')}</div>
+      <div class="kv">${kv('میانهٔ تغییر پایانی فردا', sgn(e.next_close_median_pct, 2, '٪'))}${kv('میانهٔ گپ بازگشایی', sgn(e.open_gap_median_pct, 2, '٪'))}
+      ${kv('احتمال صف خرید / فروش فردا', num(e.next_buy_queue_pct, 0, '٪') + ' / ' + num(e.next_sell_queue_pct, 0, '٪'))}${kv('از آخرین قیمت امروز تا پایانی فردا (میانه)', sgn(e.from_last_price_to_next_close_median_pct, 2, '٪'))}
+      ${kv('از آخرین قیمت امروز تا ۵ جلسه بعد (میانه)', sgn(e.from_last_price_to_5d_median_pct, 2, '٪'))}${kv('بالا در ۵ جلسه / میانهٔ ۵ جلسه', num(e.up_in_5d_pct, 0, '٪') + ' / ' + sgn(e.five_day_median_pct, 2, '٪'))}</div>
+      <p class="small">هزینهٔ خرید و فروش حدود <b class="n">${nf(e.round_trip_cost_pct, 2)}٪</b> است. ${esc(ns.applies ? ns.note : '')}</p>`;
+    if ((ns.confidence_flags || []).length) h += `<ul class="warns">${ns.confidence_flags.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    h += `<p class="muted small">${esc(ns.walk_forward || '')}</p></div>`;
+    return h;
+  }
+  function replayCard(b) {
+    const r = b.replay || {}, o = r.outcome || {}, c = r.check || {};
+    if (r.error) return `<div class="err"><b>آزمون گذشته:</b> ${esc(r.error)}</div>`;
+    const vcls = c.verdict === 'RIGHT' ? 'ok' : c.verdict === 'WRONG' ? 'bad' : '';
+    const VFA = { RIGHT: 'درست', WRONG: 'غلط', FLAT: 'بی‌حرکت (±۰٫۵٪)', NO_CALL: 'پیش‌بینی جهت نداشت' };
+    return `<div class="card"><div><b>آزمون گذشته</b> — داده تا پایان جلسهٔ <b>${esc(faDigits(r.session_used || r.as_of || ''))}</b>؛ جلسهٔ بعد: <b>${esc(faDigits(o.next_session || '—'))}</b></div>
+      <p class="small">اول برگه را فقط با داده‌های پایین بنویسید (یا «کپی برای Claude» بزنید)، بعد نتیجه را باز کنید و «کپی نتیجهٔ واقعی» را برای کالبدشکافی به Claude بدهید.</p>
+      <details class="sec"><summary>نتیجهٔ واقعی و بررسی (بعد از نوشتن برگه باز کنید)</summary><div class="in">
+      <div class="chips"><span class="badge ${vcls}">پیش‌بینی جلسهٔ بعد: ${esc(CALL_FA[c.next_session_call] || '—')} → واقعی: ${esc(CALL_FA[c.real_next] || '—')} · ${esc(VFA[c.verdict] || '—')}</span></div>
+      <div class="kv">${kv('تغییر پایانی جلسهٔ بعد', sgn(o.next_close_pct, 2, '٪'))}${kv('گپ بازگشایی', sgn(o.open_gap_pct, 2, '٪'))}${kv('صف جلسهٔ بعد', esc(QUEUE_FA[o.next_queue] || o.next_queue || '—'))}
+      ${kv('از آخرین قیمت تا پایانی بعد', sgn(o.from_last_price_to_next_close_pct, 2, '٪'))}${kv('بازده ۳ / ۵ جلسه', sgn(o.ret_3d_pct, 2, '٪') + ' / ' + sgn(o.ret_5d_pct, 2, '٪'))}
+      ${kv('شاخص گروه / کل در جلسهٔ بعد', sgn(o.group_index_next_pct, 2, '٪') + ' / ' + sgn(o.total_index_next_pct, 2, '٪'))}${kv('تصمیم v2.3 (۵ روزه)', esc(c.v23_decision || '—') + (c.v23_decision_right_5d === true ? ' ✓' : c.v23_decision_right_5d === false ? ' ✗' : ''))}
+      ${kv('معاملهٔ یک‌روزه از آخرین قیمت (خالص)', sgn(c.one_day_trade_from_last_net_pct, 2, '٪'))}</div>
+      ${(c.reasons || []).length ? `<div class="chips"><span class="lbl">علت:</span>${c.reasons.map(x => `<span class="chip">${esc(REASON_FA[x] || x)}</span>`).join('')}</div>` : ''}
+      ${(o.news_until_next_close || []).length ? `<ul class="small">${o.news_until_next_close.map(x => `<li>${esc(faDigits(x[0]))} — ${esc(TYPE_FA[x[1]] || x[1])}: ${esc(fixFa(x[2]))}</li>`).join('')}</ul>` : ''}
+      <div class="row"><button class="btn" data-act="copy-outcome">کپی نتیجهٔ واقعی برای Claude</button></div></div></details></div>`;
+  }
+
   function headCard(b, t) {
     const d = t && t.daily, ins = t && t.instrument;
     const today = tehranInt(0);
-    const fresh = d ? (d.date === today ? '<span class="badge ok">دادهٔ امروز</span>' : `<span class="badge warn">آخرین جلسه: ${jd(d.date)} (امروز نیست)</span>`) : '';
+    const fresh = t && t.replay ? `<span class="badge warn">آزمون گذشته: پایان جلسهٔ ${jd(d && d.date)}</span>`
+      : d ? (d.date === today ? '<span class="badge ok">دادهٔ امروز</span>' : `<span class="badge warn">آخرین جلسه: ${jd(d.date)} (امروز نیست)</span>`) : '';
     const st = ins && ins.state ? fixFa(ins.state) : '';
     const stBad = st && (!/^مجاز/.test(st) || /متوقف|ممنوع/.test(st));
     const warns = [...((t && t.warnings) || [])];
@@ -185,6 +232,7 @@ const PetroWatch = (() => {
     else if (p.signal && p.signal.side === 'sell') h += '<div class="note bad"><b>فروش (سیگنال مدل):</b> اگر دارید، جلسهٔ بعد بعد از ۱۰:۳۰ بفروشید؛ در صف فروش نفروشید.</div>';
     else if (p.signal_blocked) h += `<div class="note warn">موقعیت ${esc(p.situation)} (${esc(p.signal_blocked)}): جدول احتمال مدل برای این وضعیت معتبر نیست و سیگنال خرید یا فروش داده نمی‌شود.</div>`;
     else h += '<div class="small" style="margin-top:6px">سیگنال خرید یا فروش مدل: <b>ندارد</b>.</div>';
+    if (p.signal && t.next_session && t.next_session.applies) h += '<div class="note warn">پالایشی‌ها (آزمون ۲٫۴، ۱۳۹۲ تا ۱۴۰۵): این سیگنال بعد از هزینهٔ ۱٫۲۵٪ لبه نداشت؛ یک روزه حدود −۱٫۴٪ و ۵ روزه حدود +۰٫۳٪. آن را فقط با دلیل دیگر (کدال، بنیادی، خبر گروهی) و با اطمینان پایین به کار ببرید.</div>';
     const g = p.trigger;
     h += `<div class="kv" style="margin-top:8px">${kv('اگر ندارید: خرید اگر پایانی بالای', `<b>${num(g.level)}</b>${g.reachableTomorrow ? '' : ' <span class="muted small">(فردا دست‌یافتنی نیست)</span>'}`)}
       ${kv('مقدار و حد ضرر بعد از این خرید', `${num(g.size, 0, '٪')} سرمایه · حد ضرر ${num(g.stop)}`)}${kv('هدف', num(g.target))}${kv('اگر دارید: حد ضرر', `<b>${num(p.holdStop)}</b>`)}</div>
@@ -407,6 +455,7 @@ const PetroWatch = (() => {
     const m = b.meta || {}, L = [`نماد: ${fixFa(b.symbol)}`];
     const extra = [m.horizon && `افق: ${m.horizon} روز`, m.position && `وضعیت: ${m.position}`, m.risk && `ریسک هر معامله: ${m.risk}٪ سرمایه`].filter(Boolean);
     if (extra.length) L.push(extra.join(' · '));
+    if (b.replay) L.push(`آزمون گذشته: ${fixFa(b.replay.session_used || b.as_of)} — داده‌ها تا پایان همین جلسه است. برگه را برای جلسهٔ بعد بنویس و خط ثبت را بده؛ نتیجهٔ واقعی را بعداً می‌فرستم (بخش ۷-ب پرامپت).`);
     L.push('', `داده‌ها با پنل «دیدبان پتروشیمی» (نسخهٔ ${PW_VERSION}) در ${tehranTime(b.collected_at)} به وقت تهران جمع شد. برای گام ۱ از همین خروجی‌ها استفاده کن؛ فقط بخشی را که خطا دارد یا نیامده دوباره بگیر.`);
     // OHLC for the chart: the last 150 daily and 52 weekly bars are enough for Claude to draw it
     const ts = b.tsetmc && b.tsetmc.technical ? { ...b.tsetmc, technical: { ...b.tsetmc.technical, ohlc_daily: (b.tsetmc.technical.ohlc_daily || []).slice(-150), ohlc_weekly: (b.tsetmc.technical.ohlc_weekly || []).slice(-52) } } : b.tsetmc;
@@ -427,6 +476,13 @@ const PetroWatch = (() => {
     return out;
   }
   const keyOf = o => `${o.date}|${o.symbol}|${o.decision}`;
+  // text for the post-mortem step of a replay test (sent only after the sheet was written)
+  function outcomeText(b) {
+    const r = b.replay || {};
+    return [`نتیجهٔ واقعی آزمون گذشته — ${fixFa(b.symbol)} — داده تا ${fixFa(r.session_used || b.as_of)}`,
+      'برگه‌ای را که نوشتی با این نتیجه بسنج و کالبدشکافی کن (بخش ۷-ب پرامپت): درست یا غلط، علت، و آیا قاعده‌ای باید عوض شود.',
+      '', '### outcome', '```json\n' + JSON.stringify(r.outcome || {}) + '\n```', '', '### check', '```json\n' + JSON.stringify(r.check || {}) + '\n```'].join('\n');
+  }
 
   // ---------------------------------------------------------------- panel UI
   const ICON = {
@@ -465,7 +521,8 @@ const PetroWatch = (() => {
               <button class="btn primary" type="submit" data-el="go">گرفتن داده</button></form>
             <div class="opts"><label><input type="checkbox" name="t" ${opts.t ? 'checked' : ''}> tsetmc</label><label><input type="checkbox" name="c" ${opts.c ? 'checked' : ''} ${CAN.codal ? '' : 'disabled'}> کدال</label>
               <label>روزهای کدال <input class="inp" type="number" name="days" min="10" max="365" value="${esc(opts.days)}"></label>
-              <label><input type="checkbox" name="letters" ${opts.letters ? 'checked' : ''}> متن ۳ اطلاعیهٔ مهم</label></div>
+              <label><input type="checkbox" name="letters" ${opts.letters ? 'checked' : ''}> متن ۳ اطلاعیهٔ مهم</label>
+              <label title="برای آزمون: داده تا پایان این جلسه بریده می‌شود و نتیجهٔ واقعی جلسهٔ بعد جدا نشان داده می‌شود">آزمون گذشته <input class="inp" name="asof" placeholder="۱۴۰۳/۰۷/۰۷" style="width:8.5em" inputmode="numeric"></label></div>
             <details class="more"><summary>جزئیات برای Claude (اختیاری)</summary><div class="opts">
               <label>وضعیت <select class="inp" name="position" style="width:auto"><option value="">—</option><option>ندارم</option><option>دارم</option></select></label>
               <label>افق (روز) <input class="inp" type="number" name="horizon" min="1" max="60"></label><label>ریسک هر معامله (٪) <input class="inp" type="number" name="risk" step="0.5" min="0.1" max="10"></label></div></details>
@@ -552,7 +609,7 @@ const PetroWatch = (() => {
     const g = n => f.querySelector(`[name="${n}"]`);
     const o = { days: Math.max(10, Math.min(365, +g('days').value || 120)), letters: g('letters').checked, prompt: store.get('opts', {}).prompt || false };
     store.set('opts', o);
-    return { ...o, t: g('t').checked, c: g('c').checked && CAN.codal, position: g('position').value, horizon: g('horizon').value, risk: g('risk').value };
+    return { ...o, t: g('t').checked, c: g('c').checked && CAN.codal, position: g('position').value, horizon: g('horizon').value, risk: g('risk').value, asof: latinDigits(g('asof').value || '').trim() };
   }
 
   async function run(symRaw) {
@@ -570,8 +627,10 @@ const PetroWatch = (() => {
     const b = { tool: 'petro-watch', version: PW_VERSION, symbol: sym, collected_at: new Date().toISOString(), codal_days: o.days, tsetmc: null, codal: null, letters: [],
       meta: { position: o.position || null, horizon: o.horizon || null, risk: o.risk || null } };
     const jobs = [];
-    if (o.t) { const end = step('قیمت، جریان پول، گروه و شاخص از tsetmc'); jobs.push(safe(() => PC.petroSnapshot(sym)).then(r => { b.tsetmc = r; end(!r.error, r.error); })); }
-    if (o.c) { const end = step(`اطلاعیه‌های کدال (${nf(o.days)} روز) و اخبار گروه`); jobs.push(safe(() => PC.codalSnapshot(sym, o.days)).then(r => { b.codal = r; end(!r.error, r.error ? 'خطا' : nf(r.n_letters) + ' اطلاعیه'); })); }
+    if (o.asof) { b.as_of = o.asof; const end = step(`آزمون گذشته: داده تا ${faDigits(o.asof)} و نتیجهٔ جلسهٔ بعد`); jobs.push(safe(() => PC.petroReplay(sym, o.asof)).then(r => {
+        b.tsetmc = r.snapshot || { error: r.error }; b.replay = { as_of: r.as_of, session_used: r.session_used, outcome: r.outcome, check: r.check, error: r.snapshot ? r.error : null }; end(!r.error, r.error); })); }
+    else if (o.t) { const end = step('قیمت، جریان پول، گروه و شاخص از tsetmc'); jobs.push(safe(() => PC.petroSnapshot(sym)).then(r => { b.tsetmc = r; end(!r.error, r.error); })); }
+    if (o.c) { const end = step(`اطلاعیه‌های کدال (${nf(o.days)} روز) و اخبار گروه`); jobs.push(safe(() => PC.codalSnapshot(sym, o.days, o.asof ? { asOf: o.asof } : {})).then(r => { b.codal = r; end(!r.error, r.error ? 'خطا' : nf(r.n_letters) + ' اطلاعیه'); })); }
     await Promise.all(jobs);
     if (o.letters && b.codal && !b.codal.error) {
       const pick = pickLetters(b.codal);
@@ -614,6 +673,7 @@ const PetroWatch = (() => {
     if (act === 'close') return toggle(false);
     if (act === 'wide') { const p = sh.querySelector('.panel'); p.classList.toggle('wide'); store.set('wide', p.classList.contains('wide')); return; }
     if (act === 'pick') { const i = $('[name="sym"]'); i.value = el.dataset.sym; return run(i.value); }
+    if (act === 'copy-outcome' && b && b.replay) return toast(await copyText(outcomeText(b)) ? 'نتیجهٔ واقعی کپی شد' : 'کپی نشد');
     if (act === 'copy-claude' && b) { const wp = !!($('[data-el="with-prompt"]') || {}).checked; store.set('opts', { ...store.get('opts', {}), prompt: wp }); const txt = claudeText(b, wp); return toast(await copyText(txt) ? `کپی شد (${nf(Math.round(txt.length / 1000))} هزار نویسه)` : 'کپی نشد؛ از «دانلود JSON» استفاده کنید'); }
     if (act === 'dl-json' && b) return download(`petro-${b.symbol}-${jalLatin(new Date(b.collected_at)).replace(/\//g, '')}.json`, JSON.stringify(b, null, 2));
     if (act === 'merge-toggle') { const m = $('[data-el="merge"]'); m.hidden = !m.hidden; return; }
@@ -711,6 +771,6 @@ const PetroWatch = (() => {
 // expose for console / bookmarklet use (and for a browsing agent)
 try {
   window.PetroWatch = PetroWatch;
-  if (!PW_GM) ['petroSnapshot', 'petroEvaluate', 'codalSnapshot', 'codalLetterText'].forEach(k => { if (typeof window[k] !== 'function') window[k] = PC[k]; });
+  if (!PW_GM) ['petroSnapshot', 'petroReplay', 'petroReplayRange', 'petroEvaluate', 'codalSnapshot', 'codalLetterText'].forEach(k => { if (typeof window[k] !== 'function') window[k] = PC[k]; });
 } catch (e) { /* sandbox */ }
 if (PetroWatch.site !== 'other') { if (window.top === window.self) { PetroWatch.mount(); if (!PW_GM) PetroWatch.open(); } }

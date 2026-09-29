@@ -48,7 +48,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
     <h1>دیدبان پتروشیمی</h1>
   </header>
-  <p class="lead">پنلی روی tsetmc.com و codal.ir که داده‌های لازم عامل «دیدبان پتروشیمی» (قیمت، نمودار تکنیکال با فیبوناچی و الگوها، جریان پول، روند، سطوح نمودار، رژیم گروه و اطلاعیه‌های کدال) را با یک کلیک جمع می‌کند و برای Claude آماده می‌کند. نسخهٔ 2.3.0.</p>
+  <p class="lead">پنلی روی tsetmc.com و codal.ir که داده‌های لازم عامل «دیدبان پتروشیمی» (قیمت، نمودار تکنیکال با فیبوناچی و الگوها، جریان پول، روند، سطوح نمودار، رژیم گروه و اطلاعیه‌های کدال) را با یک کلیک جمع می‌کند و برای Claude آماده می‌کند. نسخهٔ 2.4.0.</p>
 
   <h2>اجرای مستقیم</h2>
   <p class="muted">همین‌جا نماد را بدهید تا دادهٔ tsetmc (قیمت، جریان پول، روند، سطوح، رژیم و امتیاز) گرفته شود. کدال فقط از داخل codal.ir خوانده می‌شود؛ برای آن از Bookmarklet یا Tampermonkey استفاده کنید.</p>
@@ -69,7 +69,7 @@
     <div class="card">
       <h3>Bookmarklet</h3>
       <p>بدون افزونه. دکمهٔ زیر را به نوار بوک‌مارک بکشید. <b>روی codal.ir</b> بزنید تا tsetmc و کدال هر دو خوانده شوند (روی tsetmc فقط tsetmc).</p>
-      <div class="row"><a class="btn bm" href="javascript:(function(){if(window.PetroWatch){PetroWatch.open();return}var s=document.createElement('script');s.src='https://mahdi13797.github.io/petro-watch/petro-watch.js?v=2.3.0';document.documentElement.appendChild(s)})()" title="این را به نوار بوک‌مارک بکشید">دیدبان</a></div>
+      <div class="row"><a class="btn bm" href="javascript:(function(){if(window.PetroWatch){PetroWatch.open();return}var s=document.createElement('script');s.src='https://mahdi13797.github.io/petro-watch/petro-watch.js?v=2.4.0';document.documentElement.appendChild(s)})()" title="این را به نوار بوک‌مارک بکشید">دیدبان</a></div>
     </div>
     <div class="card">
       <h3>Console مرورگر</h3>
@@ -105,21 +105,21 @@
     <p><a href="https://github.com/Mahdi13797/petro-watch">کد در GitHub</a></p>
   </footer>
 </div>
-<script src="petro-watch.js?v=2.3.0"></script>
+<script src="petro-watch.js?v=2.4.0"></script>
 <script>
   const $ = id => document.getElementById(id);
   const say = (id, t) => { $(id).textContent = t; setTimeout(() => { $(id).textContent = ''; }, 3000); };
   async function copy(text) { try { await navigator.clipboard.writeText(text); return true; } catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } }
   PetroWatch.mount($('app'));
   $('copy-prompt').onclick = async () => say('copy-prompt-msg', await copy(PetroWatch.prompt) ? 'کپی شد' : 'کپی نشد');
-  $('copy-code').onclick = async () => { try { const t = await (await fetch('petro-watch.js?v=2.3.0')).text(); say('copy-code-msg', await copy(t) ? 'کپی شد' : 'کپی نشد'); } catch (e) { say('copy-code-msg', 'خطا در خواندن فایل'); } };
+  $('copy-code').onclick = async () => { try { const t = await (await fetch('petro-watch.js?v=2.4.0')).text(); say('copy-code-msg', await copy(t) ? 'کپی شد' : 'کپی نشد'); } catch (e) { say('copy-code-msg', 'خطا در خواندن فایل'); } };
   function show(text) {
     try { const data = JSON.parse(text); PetroWatch.renderInto($('view'), data); $('view-msg').textContent = ''; $('view').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     catch (e) { $('view-msg').textContent = 'JSON معتبر نیست: ' + e.message; }
   }
   $('show').onclick = () => show($('json').value);
   $('file').onchange = async e => { const f = e.target.files[0]; if (f) { const t = await f.text(); $('json').value = t; show(t); } };
-  $('sample').onclick = async () => { try { const t = await (await fetch('sample.json?v=2.3.0')).text(); $('json').value = t; show(t); } catch (e) { $('view-msg').textContent = 'نمونه پیدا نشد'; } };
+  $('sample').onclick = async () => { try { const t = await (await fetch('sample.json?v=2.4.0')).text(); $('json').value = t; show(t); } catch (e) { $('view-msg').textContent = 'نمونه پیدا نشد'; } };
 </script>
 </body>
 </html>

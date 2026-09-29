@@ -121,6 +121,9 @@ ul.warns { margin: 8px 0 0; padding: 0 18px 0 0; color: var(--warn); font-size: 
 .fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 5px; }
 .base { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); opacity: .7; }
 .pv { font-size: 12px; }
+.probs.ns .pb { grid-template-columns: 128px 1fr 44px; }
+.fill.flat { background: var(--muted); opacity: .6; }
+.fill.neg { background: var(--neg); }
 .kv4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
 .kv4 > div { background: var(--surface); border-radius: 8px; padding: 5px 8px; }
 .kv4 b { display: block; font-size: 14px; }
