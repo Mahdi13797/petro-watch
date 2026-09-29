@@ -145,6 +145,8 @@ function pwEngine(P, opt = {}) {
   // breadth of the refiners on day t (share closing in buy / sell queue, share up), excluding the row itself
   const br = new Map(); rows.forEach(x => { const e = br.get(x.d) || [0, 0, 0, 0]; e[0]++; e[1] += x.upQ ? 1 : 0; e[2] += x.dnQ ? 1 : 0; e[3] += x.chg > 0 ? 1 : 0; br.set(x.d, e); });
   rows.forEach(x => { const e = br.get(x.d); const k = e[0] - 1; x.nG = k; x.gQup = k > 0 ? R((e[1] - (x.upQ ? 1 : 0)) / k, 2) : null; x.gQdn = k > 0 ? R((e[2] - (x.dnQ ? 1 : 0)) / k, 2) : null; x.gUp = k > 0 ? R((e[3] - (x.chg > 0 ? 1 : 0)) / k, 2) : null; });
+  // returns measured from the price you can really trade at before today's close (the last price)
+  rows.forEach(x => { x.rL1 = x.r1 !== null && x.lc ? R((1 + x.r1) / x.lc - 1) : null; x.rL5 = x.r5 !== null && x.lc ? R((1 + x.r5) / x.lc - 1) : null; x.rL3 = x.r3 !== null && x.lc ? R((1 + x.r3) / x.lc - 1) : null; });
   const byDay5 = new Map(); rows.forEach(x => { if (x.r5 === null) return; const e = byDay5.get(x.d) || [0, 0]; e[0] += x.r5; e[1]++; byDay5.set(x.d, e); });
   rows.forEach(x => { const e = byDay5.get(x.d); x.xs5 = e && e[1] > 1 && x.r5 !== null ? R((e[0] - x.r5) / (e[1] - 1)) : null; });
   return { rows, limits };

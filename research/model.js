@@ -11,7 +11,8 @@ const PM = (() => {
   const mean = v => v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
   const tsv = rows => rows.map(r => r.join('\t')).join('\n');
   const f2 = x => x === null || x === undefined || !isFinite(x) ? '-' : (Math.round(x * 100) / 100).toFixed(2);
-  const up = r => r.r1 > 0 ? 1 : 0;
+  let TGT = 'r1'; const up = r => r[TGT] > 0 ? 1 : 0;
+  const setTarget = k => { TGT = k; return k; };
 
   // inputs shared by C and D (all known at the close of day t)
   const FEATS = [
@@ -60,7 +61,7 @@ const PM = (() => {
     const ps = rows.map(p), ys = rows.map(up);
     const brier = mean(ps.map((q, i) => (ys[i] - q) ** 2));
     const confUp = rows.filter((r, i) => ps[i] >= 0.65), confDn = rows.filter((r, i) => ps[i] <= 0.35);
-    const acc = (a, s) => a.length ? Math.round(100 * a.filter(r => s > 0 ? r.r1 > 0 : r.r1 < 0).length / a.length) : null;
+    const acc = (a, s) => a.length ? Math.round(100 * a.filter(r => s > 0 ? r[TGT] > 0 : r[TGT] < 0).length / a.length) : null;
     // (i) act before today's close at ~today's price, exit next day: impossible if today is a queue on your side
     const exI = confUp.filter(r => !r.upQ), exIs = confDn.filter(r => !r.dnQ);
     // (ii) act tomorrow at tomorrow's average price (پایانی), exit the day after; impossible if tomorrow is a queue on your side
@@ -73,7 +74,7 @@ const PM = (() => {
   const mline = (y, name, M) => [y, name, M.n, f2(M.brier), f2(M.auc), M.upN, M.upAcc, M.dnN, M.dnAcc, M.exI_n, M.exI_acc, f2(M.exI_r1), M.exIs_n, M.exIs_acc, M.exII_n, f2(M.exII_ret), M.exII_up];
 
   function walk(R, years = [1403, 1404, 1405], opt = {}) {
-    const base = R.filter(r => r.sit === 'D' && r.regime && r.r1 !== null && jy(r) >= 1392);
+    const base = R.filter(r => r.sit === 'D' && r.regime && r[TGT] !== null && r[TGT] !== undefined && jy(r) >= 1392);
     const out = [HEAD]; const fitted = {};
     for (const Y of years) {
       const tr = base.filter(r => jy(r) < Y), te = base.filter(r => jy(r) === Y);
@@ -106,6 +107,6 @@ const PM = (() => {
     return [...st(s1), ...st(s2), ...st(selS)];
   }
   const SHEAD = ['S1 n', 'S1 net%', 'S1 win%', 'S2 n', 'S2 net%', 'S2 win%', 'H1 n', 'H1 saved%', 'H1 right%'];
-  return { strat, SHEAD, COST, FEATS, X, logit, table, points, scoreOf, sband, auc, metrics, walk, HEAD, mline, tsv, f2, mean, jy };
+  return { setTarget, strat, SHEAD, COST, FEATS, X, logit, table, points, scoreOf, sband, auc, metrics, walk, HEAD, mline, tsv, f2, mean, jy };
 })();
 if (typeof window !== 'undefined') window.PM = PM;
