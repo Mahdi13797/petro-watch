@@ -131,6 +131,9 @@ function pwEngine(P, opt = {}) {
         o1: nx ? R(O[t + 1] / C[t] - 1) : null, h1: nx ? R(H[t + 1] / C[t] - 1) : null, l1: nx ? R(Lo[t + 1] / C[t] - 1) : null, ls1: nx ? R(LS[t + 1] / C[t] - 1) : null,
         tr1: t + 2 < n ? R(C[t + 2] / C[t + 1] - 1) : null, tr5: t + 6 < n ? R(C[t + 6] / C[t + 1] - 1) : null,
         nxUpQ, nxDnQ, adjNext: t + 1 < n ? adjAt[t + 1] : null,
+        q2Up: t + 2 < n ? (D[t + 2].last / D[t + 2].y - 1 >= limOf(D[t + 2].mk, D[t + 2].d)[0] - 0.0015 && D[t + 2].last >= D[t + 2].h) : null,
+        q2Dn: t + 2 < n ? (D[t + 2].last / D[t + 2].y - 1 <= -(limOf(D[t + 2].mk, D[t + 2].d)[1] - 0.0015) && D[t + 2].last <= D[t + 2].l) : null,
+        tr2: t + 3 < n ? R(C[t + 3] / C[t + 1] - 1) : null,
         gN1: nx ? R(ixFwd(IX.g23, r.d, 1)) : null, TN1: nx ? R(ixFwd(IX.total, r.d, 1)) : null, EN1: nx ? R(ixFwd(IX.eqw, r.d, 1)) : null
       };
       rows.push(row);
