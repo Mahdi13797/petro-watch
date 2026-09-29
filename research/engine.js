@@ -28,8 +28,8 @@ function pwEngine(P, opt = {}) {
   const syms = Object.keys(P.sym), S = {};
   for (const s of syms) {
     const dm = new Map(), cm = new Map();
-    for (const ins of P.sym[s]) { for (const r of ins.d) if (r[7] > 0) dm.set(r[0], r); for (const r of ins.c) cm.set(r[0], r); }
-    S[s] = { D: [...dm.values()].sort((a, b) => a[0] - b[0]).map(r => ({ d: r[0], o: r[1], h: r[2], l: r[3], last: r[4], c: r[5], y: r[6], v: r[7], val: r[8] })), CT: cm };
+    for (const ins of P.sym[s]) { const mk = ins.info && ins.info.flow === 2 ? 'fara' : 'bourse'; for (const r of ins.d) if (r[7] > 0) dm.set(r[0], [...r, mk]); for (const r of ins.c) cm.set(r[0], r); }
+    S[s] = { D: [...dm.values()].sort((a, b) => a[0] - b[0]).map(r => ({ d: r[0], o: r[1], h: r[2], l: r[3], last: r[4], c: r[5], y: r[6], v: r[7], val: r[8], mk: r[10] })), CT: cm };
   }
 
   // ---------- daily price limits, estimated from the market itself (mode of the day's max/min move, ±60 trading days)
@@ -42,11 +42,14 @@ function pwEngine(P, opt = {}) {
   const modeWin = (arr, i, w) => { const c = new Map(); for (let k = Math.max(0, i - w); k <= Math.min(arr.length - 1, i + w); k++) if (arr[k] !== null) c.set(arr[k], (c.get(arr[k]) || 0) + 1); let best = null, bn = 0; c.forEach((n, v) => { if (n > bn || (n === bn && v > best)) { best = v; bn = n; } }); return best; };
   // actual thresholds when available (opt.thresholds[date] = { y, recs: [[hEven, max, min]...] } of one reference stock,
   // from MarketData/GetStaticThreshold); the day's LAST record is the range in force at the close
-  const TH = opt.thresholds || {};
-  const thPct = d => { const x = TH[d]; if (!x || !x.recs || !x.recs.length || !(x.y > 0)) return null; const q = x.recs[x.recs.length - 1];
+  // opt.thresholds = { bourse: {date: ...}, fara: {date: ...} } (farabourse ranges sometimes differ)
+  const THM = opt.thresholds || {};
+  const thPct = (mk, d) => { const x = (THM[mk] || {})[d]; if (!x || !x.recs || !x.recs.length || !(x.y > 0)) return null; const q = x.recs[x.recs.length - 1];
     const u = Math.round((q[1] / x.y - 1) * 200) / 200, dn = Math.round((1 - q[2] / x.y) * 200) / 200; return u >= 0.005 && u <= 0.1 && dn >= 0.005 && dn <= 0.1 ? [u, dn] : null; };
-  const LIM = new Map(); const limits = [];
-  allD.forEach((d, i) => { const th = thPct(d); const u = th ? th[0] : (modeWin(upG, i, 60) || 0.05), dn = th ? th[1] : (modeWin(dnG, i, 60) || 0.05); LIM.set(d, [u, dn]); if (!limits.length || limits[limits.length - 1][1] !== u || limits[limits.length - 1][2] !== dn) limits.push([d, u, dn]); });
+  const LIMe = new Map(); allD.forEach((d, i) => LIMe.set(d, [modeWin(upG, i, 60) || 0.05, modeWin(dnG, i, 60) || 0.05]));
+  const limOf = (mk, d) => thPct(mk, d) || thPct(mk === 'fara' ? 'bourse' : 'fara', d) || LIMe.get(d) || [0.05, 0.05];
+  const LIM = { get: d => limOf('bourse', d) }; const limits = [];
+  allD.forEach(d => { const [u, dn] = limOf('bourse', d); if (!limits.length || limits[limits.length - 1][1] !== u || limits[limits.length - 1][2] !== dn) limits.push([d, u, dn]); });
 
   // ---------- v2.3 calibration table (group 44, 1392-1405): [n, p1, p3, p5, p10, med5, gain5, loss5]
   const CAL = { hot: { '<=-4': [30, .10, .23, .20, .27, -3.3, 3.4, -5.6], '-3..-2': [2575, .25, .52, .55, .58, 0.8, 6.7, -4.8], '-1..+1': [9398, .51, .54, .57, .61, 1.0, 6.4, -4.2], '+2..+3': [2332, .76, .56, .57, .60, 1.1, 7.0, -4.5], '>=+4': [141, .87, .72, .74, .78, 4.4, 10.1, -3.5], ALL: [14476, .50, .54, .57, .61, 1.0, 6.6, -4.4] },
@@ -81,7 +84,7 @@ function pwEngine(P, opt = {}) {
       if (adjAt[t]) lastAdjDay = D[t].d;
       const r = D[t], hist = ipoIdx >= 0 ? t - ipoIdx + 1 : t + 1, ok = k => hist >= k;
       if (t < 25) continue;
-      const [lu, ld] = LIM.get(r.d) || [0.05, 0.05];
+      const [lu, ld] = limOf(r.mk, r.d);
       const chgLast = r.last / r.y - 1, chgClose = r.c / r.y - 1;
       const upQ = chgLast >= lu - 0.0015 && r.last >= r.h, dnQ = chgLast <= -(ld - 0.0015) && r.last <= r.l;
       const m20 = sma(t, 20), sd20 = ok(20) && m20 ? Math.sqrt(Math.max(0, (csq[t + 1] - csq[t - 19]) / 20 - m20 * m20)) : null;
@@ -109,7 +112,7 @@ function pwEngine(P, opt = {}) {
       // what happened next
       const nx = t + 1 < n ? D[t + 1] : null;
       const f1 = k => t + k < n ? C[t + k] / C[t] - 1 : null;
-      const nxLim = nx ? (LIM.get(nx.d) || [0.05, 0.05]) : null;
+      const nxLim = nx ? limOf(nx.mk, nx.d) : null;
       const nxUpQ = nx ? (nx.last / nx.y - 1 >= nxLim[0] - 0.0015 && nx.last >= nx.h) : null;
       const nxDnQ = nx ? (nx.last / nx.y - 1 <= -(nxLim[1] - 0.0015) && nx.last <= nx.l) : null;
       const row = {
@@ -119,7 +122,7 @@ function pwEngine(P, opt = {}) {
         r5b: t >= 5 ? R(C[t] / C[t - 5] - 1) : null, r20b: t >= 20 ? R(C[t] / C[t - 20] - 1) : null, atr: R(ATR[t] / C[t]), volr: t >= 21 ? R(V[t] / ((vsum[t] - vsum[t - 20]) / 20), 2) : null, val: VAL[t],
         sma20: m20 ? R(C[t] / m20 - 1) : null, sma50: sma(t, 50) ? R(C[t] / sma(t, 50) - 1) : null,
         g1: R(ixBack(IX.g23, r.d, 1)), g5: R(ixBack(IX.g23, r.d, 5)), T1: R(ixBack(IX.total, r.d, 1)), T20: R(ixBack(IX.total, r.d, 20)), E1: R(ixBack(IX.eqw, r.d, 1)), q44: R(ixBack(IX.g44, r.d, 20)),
-        adj7, lu, ld, hist,
+        adj7, lu, ld, hist, mk: r.mk,
         // outcome
         nd: nx ? nx.d : null, gapDays: nx ? Math.round((toUTC(nx.d) - toUTC(r.d)) / 864e5) : null,
         r1: R(f1(1)), r2: R(f1(2)), r3: R(f1(3)), r5: R(f1(5)), r10: R(f1(10)),
