@@ -86,6 +86,21 @@ const PA = (() => {
     const a = R.filter(filt).sort((x, y) => (typeof sortKey === 'function' ? sortKey(x) - sortKey(y) : 0)).slice(0, k);
     return tsv([cols.map(c => typeof c === 'string' ? c : c[0]), ...a.map(r => cols.map(c => { const v = typeof c === 'string' ? r[c] : c[1](r); return v === null || v === undefined ? '-' : typeof v === 'number' && Math.abs(v) < 1 && v !== 0 && !Number.isInteger(v) ? (100 * v).toFixed(1) : v; }))]);
   }
-  return { decisions, calibration, components, errors, list, line, HEAD, why, group, upRate, dnRate, avg, mean, f2, jy, era, tsv, oc };
+  // residuals: for rows where a condition holds, how far the real next-day up-rate is from the table's p1,
+  // overall and in each market era (a condition that keeps the same sign in every era is something the table misses)
+  const ERAS = ['92-96', '97-98', '99-00', '01-02', '03-05'];
+  function resid(R, conds, filt = () => true, tgt = 'r1', pk = 'p1') {
+    const a = R.filter(r => r.sit === 'D' && r[tgt] !== null && r[pk] !== null && filt(r));
+    const out = [['condition', 'n', 'real up%', 'table%', 'resid pp', ...ERAS.map(e => 'resid ' + e), 'same sign', 'trade1 %', 'trade1 up%']];
+    const res = g => g.length ? 100 * mean(g.map(r => (r[tgt] > 0 ? 1 : 0) - r[pk])) : null;
+    for (const [name, f] of conds) {
+      const g = a.filter(f); if (g.length < 30) { out.push([name, g.length]); continue; }
+      const rr = res(g), byE = ERAS.map(e => { const h = g.filter(r => era(jy(r)) === e); return h.length >= 15 ? res(h) : null; });
+      const same = byE.filter(x => x !== null && Math.sign(x) === Math.sign(rr)).length + '/' + byE.filter(x => x !== null).length;
+      out.push([name, g.length, upRate(g, tgt), Math.round(100 * mean(g.map(r => r[pk]))), f2(rr), ...byE.map(x => x === null ? '-' : Math.round(x)), same, f2(avg(g, 'tr1')), upRate(g, 'tr1')]);
+    }
+    return tsv(out);
+  }
+  return { decisions, calibration, components, errors, list, line, HEAD, why, group, upRate, dnRate, avg, mean, f2, jy, era, tsv, oc, resid, ERAS };
 })();
 if (typeof window !== 'undefined') window.PA = PA;

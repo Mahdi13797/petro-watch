@@ -79,14 +79,16 @@ function pwEngine(P, opt = {}) {
     const F = D.map(r => { const x = S[s].CT.get(r.d); if (!x) return null; const bIval = x[5], sIval = x[6], bNval = x[7], sNval = x[8], bIc = x[9], sIc = x[10];
       const bpc = bIval / Math.max(1, bIc), spc = sIval / Math.max(1, sIc); return { bpc, spc, power: spc > 0 ? bpc / spc : null, netI: bIval - sIval, netN: bNval - sNval, val: r.val, bIc, sIc }; });
     const med = a => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : null; };
-    let lastAdjDay = null;
+    let lastAdjDay = null, qUpRun = 0, qDnRun = 0, prevUp = false, prevDn = false;
     for (let t = 0; t < n; t++) {
       if (adjAt[t]) lastAdjDay = D[t].d;
       const r = D[t], hist = ipoIdx >= 0 ? t - ipoIdx + 1 : t + 1, ok = k => hist >= k;
-      if (t < 25) continue;
       const [lu, ld] = limOf(r.mk, r.d);
       const chgLast = r.last / r.y - 1, chgClose = r.c / r.y - 1;
       const upQ = chgLast >= lu - 0.0015 && r.last >= r.h, dnQ = chgLast <= -(ld - 0.0015) && r.last <= r.l;
+      // consecutive queue days BEFORE today
+      const upRun = qUpRun, dnRun = qDnRun; qUpRun = upQ ? qUpRun + 1 : 0; qDnRun = dnQ ? qDnRun + 1 : 0;
+      if (t < 25) continue;
       const m20 = sma(t, 20), sd20 = ok(20) && m20 ? Math.sqrt(Math.max(0, (csq[t + 1] - csq[t - 19]) / 20 - m20 * m20)) : null;
       const pctb = sd20 ? (C[t] - (m20 - 2 * sd20)) / (4 * sd20) : null;
       const rsi = ok(30) ? RSI[t] : null;
@@ -122,7 +124,7 @@ function pwEngine(P, opt = {}) {
         r5b: t >= 5 ? R(C[t] / C[t - 5] - 1) : null, r20b: t >= 20 ? R(C[t] / C[t - 20] - 1) : null, atr: R(ATR[t] / C[t]), volr: t >= 21 ? R(V[t] / ((vsum[t] - vsum[t - 20]) / 20), 2) : null, val: VAL[t],
         sma20: m20 ? R(C[t] / m20 - 1) : null, sma50: sma(t, 50) ? R(C[t] / sma(t, 50) - 1) : null,
         g1: R(ixBack(IX.g23, r.d, 1)), g5: R(ixBack(IX.g23, r.d, 5)), T1: R(ixBack(IX.total, r.d, 1)), T20: R(ixBack(IX.total, r.d, 20)), E1: R(ixBack(IX.eqw, r.d, 1)), q44: R(ixBack(IX.g44, r.d, 20)),
-        adj7, lu, ld, hist, mk: r.mk,
+        adj7, lu, ld, hist, mk: r.mk, upRun, dnRun, dow: nx ? new Date(toUTC(nx.d)).getUTCDay() : null,
         // outcome
         nd: nx ? nx.d : null, gapDays: nx ? Math.round((toUTC(nx.d) - toUTC(r.d)) / 864e5) : null,
         r1: R(f1(1)), r2: R(f1(2)), r3: R(f1(3)), r5: R(f1(5)), r10: R(f1(10)),
@@ -137,6 +139,9 @@ function pwEngine(P, opt = {}) {
   // cross-section: mean next-day return of the other symbols on the same day (the "group move" the stock could not escape)
   const byDay = new Map(); rows.forEach(x => { if (x.r1 === null) return; const e = byDay.get(x.d) || [0, 0]; e[0] += x.r1; e[1]++; byDay.set(x.d, e); });
   rows.forEach(x => { const e = byDay.get(x.d); x.xs1 = e && e[1] > (x.r1 !== null ? 1 : 0) ? R((e[0] - (x.r1 || 0)) / (e[1] - (x.r1 !== null ? 1 : 0))) : null; });
+  // breadth of the refiners on day t (share closing in buy / sell queue, share up), excluding the row itself
+  const br = new Map(); rows.forEach(x => { const e = br.get(x.d) || [0, 0, 0, 0]; e[0]++; e[1] += x.upQ ? 1 : 0; e[2] += x.dnQ ? 1 : 0; e[3] += x.chg > 0 ? 1 : 0; br.set(x.d, e); });
+  rows.forEach(x => { const e = br.get(x.d); const k = e[0] - 1; x.nG = k; x.gQup = k > 0 ? R((e[1] - (x.upQ ? 1 : 0)) / k, 2) : null; x.gQdn = k > 0 ? R((e[2] - (x.dnQ ? 1 : 0)) / k, 2) : null; x.gUp = k > 0 ? R((e[3] - (x.chg > 0 ? 1 : 0)) / k, 2) : null; });
   const byDay5 = new Map(); rows.forEach(x => { if (x.r5 === null) return; const e = byDay5.get(x.d) || [0, 0]; e[0] += x.r5; e[1]++; byDay5.set(x.d, e); });
   rows.forEach(x => { const e = byDay5.get(x.d); x.xs5 = e && e[1] > 1 && x.r5 !== null ? R((e[0] - x.r5) / (e[1] - 1)) : null; });
   return { rows, limits };
