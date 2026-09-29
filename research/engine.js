@@ -57,7 +57,7 @@ function pwEngine(P, opt = {}) {
     cold: { '<=-4': [535, .18, .36, .38, .46, -0.6, 4.1, -2.5], '-3..-2': [2789, .31, .42, .43, .48, -0.5, 4.6, -3.4], '-1..+1': [5497, .49, .46, .47, .49, -0.2, 5.2, -4.0], '+2..+3': [1177, .76, .49, .50, .49, 0.0, 5.9, -4.4], '>=+4': [65, .77, .62, .57, .54, 1.9, 7.2, -4.9], ALL: [10063, .45, .45, .46, .48, -0.3, 5.1, -3.8] } };
   const band = s => s <= -4 ? '<=-4' : s <= -2 ? '-3..-2' : s <= 1 ? '-1..+1' : s <= 3 ? '+2..+3' : '>=+4';
 
-  const rows = [];
+  const rows = [], series = {};
   for (const s of syms) {
     const D = S[s].D, n = D.length; if (n < 30) continue;
     const ipoIdx = D.findIndex(r => r.y === 1000 && r.c > 1500);
@@ -67,6 +67,11 @@ function pwEngine(P, opt = {}) {
     for (let i = n - 2; i >= 0; i--) { let q = (i + 1 === ipoIdx) ? 1 : D[i + 1].y / D[i].c; if (q > 0.995 && q < 1.005) q = 1; else adjAt[i + 1] = true; fac[i] = fac[i + 1] * q; }
     const C = D.map((r, i) => r.c * fac[i]), H = D.map((r, i) => r.h * fac[i]), Lo = D.map((r, i) => r.l * fac[i]), O = D.map((r, i) => (r.o || r.c) * fac[i]), LS = D.map((r, i) => r.last * fac[i]);
     const V = D.map(r => r.v), VAL = D.map(r => r.val);
+    // adjusted daily path + queue flags for every day (used by research/swing.js to walk stops and targets)
+    const UQ = D.map(r => { const [a] = limOf(r.mk, r.d); return r.last / r.y - 1 >= a - 0.0015 && r.last >= r.h; });
+    const DQ = D.map(r => { const [, b] = limOf(r.mk, r.d); return r.last / r.y - 1 <= -(b - 0.0015) && r.last <= r.l; });
+    const LOCK = D.map((r, i) => DQ[i] && r.h === r.l);   // traded only at the lower limit all day: nobody could sell
+    series[s] = { d: D.map(r => r.d), O, H, L: Lo, C, LS, UQ, DQ, LOCK };
     // indicators (causal)
     const wil = (a, k) => { const e = []; a.forEach((x, i) => e.push(i ? e[i - 1] + (x - e[i - 1]) / k : x)); return e; };
     const up = C.map((x, i) => i ? Math.max(0, x - C[i - 1]) : 0), dn = C.map((x, i) => i ? Math.max(0, C[i - 1] - x) : 0);
@@ -118,7 +123,7 @@ function pwEngine(P, opt = {}) {
       const nxUpQ = nx ? (nx.last / nx.y - 1 >= nxLim[0] - 0.0015 && nx.last >= nx.h) : null;
       const nxDnQ = nx ? (nx.last / nx.y - 1 <= -(nxLim[1] - 0.0015) && nx.last <= nx.l) : null;
       const row = {
-        s, d: r.d, j: g2j(r.d), sit, regime, gr20: R(gr20), sub, band: bd, pts: P2, dec, edge, p1: cal ? cal[1] : null, p5: cal ? cal[3] : null, b1: base ? base[1] : null, b5: base ? base[3] : null,
+        s, ti: t, d: r.d, j: g2j(r.d), sit, regime, gr20: R(gr20), sub, band: bd, pts: P2, dec, edge, p1: cal ? cal[1] : null, p5: cal ? cal[3] : null, b1: base ? base[1] : null, b5: base ? base[3] : null,
         upQ, dnQ, lmc: R(lmc, 2), lc: R(LS[t] / C[t], 5), chg: R(100 * chgClose, 2), chgL: R(100 * chgLast, 2), gapT: t ? R(100 * (O[t] / C[t - 1] - 1), 2) : null,
         rsi: R(rsi, 1), pctb: R(pctb, 2), pw: R(pw, 2), pcr: R(pcr, 2), netI: fl && fl.val ? R(fl.netI / fl.val, 3) : null, netN: fl && fl.val ? R(fl.netN / fl.val, 3) : null,
         r5b: t >= 5 ? R(C[t] / C[t - 5] - 1) : null, r20b: t >= 20 ? R(C[t] / C[t - 20] - 1) : null, atr: R(ATR[t] / C[t]), volr: t >= 21 ? R(V[t] / ((vsum[t] - vsum[t - 20]) / 20), 2) : null, val: VAL[t],
@@ -149,7 +154,7 @@ function pwEngine(P, opt = {}) {
   rows.forEach(x => { x.rL1 = x.r1 !== null && x.lc ? R((1 + x.r1) / x.lc - 1) : null; x.rL5 = x.r5 !== null && x.lc ? R((1 + x.r5) / x.lc - 1) : null; x.rL3 = x.r3 !== null && x.lc ? R((1 + x.r3) / x.lc - 1) : null; });
   const byDay5 = new Map(); rows.forEach(x => { if (x.r5 === null) return; const e = byDay5.get(x.d) || [0, 0]; e[0] += x.r5; e[1]++; byDay5.set(x.d, e); });
   rows.forEach(x => { const e = byDay5.get(x.d); x.xs5 = e && e[1] > 1 && x.r5 !== null ? R((e[0] - x.r5) / (e[1] - 1)) : null; });
-  return { rows, limits };
+  return { rows, limits, series };
 }
 
 /* small helpers for analysis in the browser console: group, summarise, print */
