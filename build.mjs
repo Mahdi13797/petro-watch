@@ -38,7 +38,7 @@ const PW_NET = pwMakeNet(PW_GM);
 // ---- collector (src/petro_collector.js, unchanged); its \`fetch\` is the bridge above
 const PC = (function (fetch) {
 ${collector}
-return { petroSnapshot, petroEvaluate, codalSnapshot, codalLetterText, codalClassify };
+return { petroSnapshot, petroReplay, petroReplayRange, petroEvaluate, codalSnapshot, codalLetterText, codalClassify };
 })(PW_NET.fetch);
 
 ${chart}

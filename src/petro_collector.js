@@ -13,12 +13,24 @@
    v2.1.2: group block uses the symbol's own sector (e.g. 23 = refineries) and its index for regime; codal peers follow the group.
    v2.3: `technical` block — OHLC (daily 320 bars, weekly 104) for drawing, Fibonacci, pivots, Ichimoku, Stochastic, Bollinger/MACD values,
          RSI divergence, candlestick and chart patterns, each with its 13-year backtest edge (techtools.py).
+   v2.4: (replay test of 11 refiners, 1392-1405, research/ in the repo)
+         · petroSnapshot(symbol, { asOf: '1403/07/07' }) rebuilds the snapshot as of the close of a past session (no future data)
+         · petroReplay(symbol, date) = as-of snapshot + what really happened next (`outcome`) + automatic check with reasons
+         · petroReplayRange(symbol, from, to) = the same for every session in a range, with a summary
+         · real daily price limits (MarketData/GetStaticThreshold) instead of a fixed ±2.85% rule; sell-queue streak
+         · `next_session` block: next-session forecast (up / flat / down) with the v2.4 score, calibrated on the refiners
+         · `codal_recent` from tsetmc's Codal list (no codal.ir rate limit); two Codal rows of the v2.4 score use it
    ========================================================================== */
 
-async function petroSnapshot(symbol) {
+async function petroSnapshot(symbol, opts = {}) {
   const BASE = 'https://cdn.tsetmc.com/api/';
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const cache = opts.cache || null;   // Map shared by petroReplayRange (same histories for every day)
   const J = async (u, tries = 4, ms = 15000) => {
+    if (cache && cache.has(u)) return cache.get(u);
+    const v = await J0(u, tries, ms); if (cache && v) cache.set(u, v); return v;
+  };
+  const J0 = async (u, tries, ms) => {
     for (let i = 0; i < tries; i++) {
       const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), ms);
       try { const r = await fetch(BASE + u, { signal: ctl.signal }); clearTimeout(tm); if (r.ok) return await r.json(); } catch (e) { clearTimeout(tm); }
@@ -28,7 +40,13 @@ async function petroSnapshot(symbol) {
   };
   const ar = s => (s || '').replace(/ی/g, 'ي').replace(/ک/g, 'ك').replace(/\s+/g, ' ').trim();
   const R = (x, d = 4) => (x === null || x === undefined || !isFinite(x)) ? null : Math.round(x * 10 ** d) / 10 ** d;
-  const out = { symbol, version: 2, generated_at: new Date().toISOString(), warnings: [] };
+  const out = { symbol, version: 2.4, generated_at: new Date().toISOString(), warnings: [] };
+  // as-of (replay) mode: '1403/07/07' (Latin or Persian digits) or a Gregorian dEven like 20240928
+  const jalOf = dEv => { const s = String(dEv); return new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8)))).replace(/[^\d/]/g, ''); };
+  let asOfJ = null, asOfD = null;
+  if (opts.asOf) { const a = String(opts.asOf).replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).trim();
+    if (/^\d{8}$/.test(a)) asOfD = +a; else { const p = a.split(/[/-]/); if (p.length !== 3) return { error: 'تاریخ آزمون را به شکل ۱۴۰۳/۰۷/۰۷ بدهید', symbol }; asOfJ = `${p[0]}/${p[1].padStart(2, '0')}/${p[2].padStart(2, '0')}`; } }
+  const REPLAY = !!opts.asOf;
 
   // ---------- 1) instrument
   const srch = await J('Instrument/GetInstrumentSearch/' + encodeURIComponent(ar(symbol)));
@@ -37,23 +55,50 @@ async function petroSnapshot(symbol) {
   if (!ins) return { error: 'نماد پیدا نشد', symbol };
   const ic = ins.insCode;
   out.instrument = { insCode: ic, name: ins.lVal30, market: ins.flowTitle, board: ins.cgrValCot };
+  // live-only endpoints are skipped in replay mode (they describe today, not the test date)
   const [info, live, bl, ctToday] = await Promise.all([
-    J(`Instrument/GetInstrumentInfo/${ic}`), J(`ClosingPrice/GetClosingPriceInfo/${ic}`),
-    J(`BestLimits/${ic}`), J(`ClientType/GetClientType/${ic}/1/0`)]);
-  const [daily, cth] = await Promise.all([J(`ClosingPrice/GetClosingPriceDailyList/${ic}/0`), J(`ClientType/GetClientTypeHistory/${ic}`)]);
+    J(`Instrument/GetInstrumentInfo/${ic}`), REPLAY ? null : J(`ClosingPrice/GetClosingPriceInfo/${ic}`),
+    REPLAY ? null : J(`BestLimits/${ic}`), REPLAY ? null : J(`ClientType/GetClientType/${ic}/1/0`)]);
+  // older listings of the same symbol (e.g. a move from Farabourse to the Bourse) are merged into one history
+  const olds = all.filter(x => x.insCode !== ic && [1, 2, 4].includes(x.flow));
+  const [daily, cth, ...oldH] = await Promise.all([J(`ClosingPrice/GetClosingPriceDailyList/${ic}/0`), J(`ClientType/GetClientTypeHistory/${ic}`),
+    ...olds.flatMap(x => [J(`ClosingPrice/GetClosingPriceDailyList/${x.insCode}/0`), J(`ClientType/GetClientTypeHistory/${x.insCode}`)])]);
   if (!daily) return { error: 'سابقهٔ قیمت از tsetmc نیامد؛ دوباره اجرا کن', symbol };
+  const dMap = new Map(), ctRows = [];
+  oldH.forEach((h, k) => { if (!h) return; if (k % 2 === 0) (h.closingPriceDaily || []).forEach(r => dMap.set(r.dEven, r)); else ctRows.push(...(h.clientType || [])); });
+  (daily.closingPriceDaily || []).forEach(r => dMap.set(r.dEven, r)); ctRows.push(...(cth?.clientType || []));
   const I = info?.instrumentInfo || {}, L = live?.closingPriceInfo || {};
   out.instrument.state = L.instrumentState?.cEtavalTitle || null;
   out.fundamental_quick = { eps_estimated: I.eps?.estimatedEPS, sector_pe: I.eps?.sectorPE, shares: I.zTitad, sector: I.sector?.lSecVal,
     avg_volume_3m: I.qTotTran5JAvg, free_float_pct: I.kAjCapValCpsIdx, price_limits_today: [I.staticThreshold?.psGelStaMin, I.staticThreshold?.psGelStaMax] };
 
   // ---------- 2) daily series (+ today's live row) and adjustment
-  const rawAll = (daily.closingPriceDaily || []).sort((a, b) => a.dEven - b.dEven);
+  let rawAll = [...dMap.values()].sort((a, b) => a.dEven - b.dEven);
+  const fullTraded = rawAll.filter(r => r.qTotTran5J > 0).map(r => r.dEven);   // dates only: used for the next session's date in replay mode
+  if (REPLAY) {
+    if (!asOfD) { let k = rawAll.length - 1; while (k >= 0 && jalOf(rawAll[k].dEven) > asOfJ) k--; asOfD = k >= 0 ? rawAll[k].dEven : 0; }
+    rawAll = rawAll.filter(r => r.dEven <= asOfD);
+    if (!asOfJ) asOfJ = jalOf(asOfD);
+  }
   let D = rawAll.filter(r => r.qTotTran5J > 0)
     .map(r => ({ d: r.dEven, o: r.priceFirst, h: r.priceMax, l: r.priceMin, last: r.pDrCotVal, c: r.pClosing, y: r.priceYesterday, v: r.qTotTran5J, val: r.qTotCap }));
-  if (L.finalLastDate && D.length && L.finalLastDate > D[D.length - 1].d && L.qTotTran5J > 0)
+  if (!REPLAY && L.finalLastDate && D.length && L.finalLastDate > D[D.length - 1].d && L.qTotTran5J > 0)
     D.push({ d: L.finalLastDate, o: L.priceFirst, h: L.priceMax, l: L.priceMin, last: L.pDrCotVal, c: L.pClosing, y: L.priceYesterday, v: L.qTotTran5J, val: L.qTotCap, live: true });
   const n = D.length, t = n - 1;
+  if (REPLAY && n) {
+    const used = D[t].d, nxt = fullTraded.find(d => d > used) || null;
+    out.replay = { as_of: asOfJ, session_used: jalOf(used), session_used_dEven: used, next_session: nxt ? jalOf(nxt) : null, next_session_dEven: nxt,
+      note: 'آزمون گذشته: همهٔ داده‌ها تا پایان همین جلسه بریده شده‌اند. دفتر سفارش، دیده‌بان بازار و جریان پول گروه در این حالت نیستند.' };
+    out.instrument.state = jalOf(used) === asOfJ ? 'مجاز (آزمون گذشته)' : 'مجاز (آزمون گذشته؛ در تاریخ آزمون معامله نشد)';
+    if (jalOf(used) !== asOfJ) out.warnings.push(`نماد در ${asOfJ} معامله نشد؛ آخرین جلسهٔ قبل از آن (${jalOf(used)}) استفاده شد`);
+    out.fundamental_quick.note = 'EPS، P/E و تعداد سهام مقادیر امروزند، نه تاریخ آزمون';
+  }
+  // the day's real price limits (the range can change: e.g. ±1% from 1403/07/07 to 1403/07/20)
+  let thr = null;
+  if (n && !D[t].live) { const th = await J(`MarketData/GetStaticThreshold/${ic}/${D[t].d}`, 2, 10000); const recs = (th?.staticThreshold || []).filter(x => x.dEven === D[t].d).sort((a, b) => a.hEven - b.hEven);
+    if (recs.length) thr = { max: recs[recs.length - 1].psGelStaMax, min: recs[recs.length - 1].psGelStaMin }; }
+  else if (I.staticThreshold?.psGelStaMax) thr = { max: I.staticThreshold.psGelStaMax, min: I.staticThreshold.psGelStaMin };
+  if (REPLAY) out.fundamental_quick.price_limits_today = thr ? [thr.min, thr.max] : null;
   if (n < 5) return { error: 'سابقهٔ معاملاتی کافی نیست', symbol, days: n };
   // IPO row (reference price = par 1000 on the first trading day) — excluded from adjustment
   const ipoIdx = D.findIndex(r => r.y === 1000 && r.c > 1500);
@@ -93,17 +138,23 @@ async function petroSnapshot(symbol) {
     vol_ratio_20: ok(21) ? R(V[t] / sma(V, 20, t - 1), 2) : null, value_today: VAL[t],
     last_minus_close_pct: R(100 * (last.last - last.c) / last.y, 2), adjustments_last_year: adjDays.filter(x => x[0] >= D[Math.max(0, t - 240)].d)
   };
-  const pMaxT = I.staticThreshold?.psGelStaMax, pMinT = I.staticThreshold?.psGelStaMin;
-  ind.closed_at_upper_limit = (pMaxT && last.live) ? last.last >= pMaxT : (chgLast >= 0.0285 && last.last >= last.h);
-  ind.closed_at_lower_limit = (pMinT && last.live) ? last.last <= pMinT : (chgLast <= -0.0285 && last.last <= last.l);
+  // queue at the close from the day's real limits (v2.4); without them: ±3% rule
+  const pMaxT = thr?.max, pMinT = thr?.min;
+  const limUp = pMaxT && last.y ? pMaxT / last.y - 1 : 0.03, limDn = pMinT && last.y ? 1 - pMinT / last.y : 0.03;
+  ind.price_limits_pct = [R(-limDn, 4), R(limUp, 4)];
+  ind.closed_at_upper_limit = pMaxT ? last.last >= pMaxT : (chgLast >= limUp - 0.0015 && last.last >= last.h);
+  ind.closed_at_lower_limit = pMinT ? last.last <= pMinT : (chgLast <= -(limDn - 0.0015) && last.last <= last.l);
   // trend class (stock level) — used to read signals in context
   ind.trend_class = (ok(51) && C[t] > ind.sma20 && ind.sma20 > ind.sma50 && ind.ret_20d > 0.10) ? 'strong_up'
     : (ok(51) && C[t] < ind.sma20 && ind.sma20 < ind.sma50 && ind.ret_20d < -0.10) ? 'strong_down' : (ok(51) ? 'other' : 'unknown_short_history');
   // streaks
-  const lim = i => (D[i].last / D[i].y - 1 >= 0.0285 && D[i].last >= D[i].h);
+  // earlier days: today's limit percentage is assumed (ranges change rarely)
+  const lim = i => (D[i].last / D[i].y - 1 >= limUp - 0.0015 && D[i].last >= D[i].h);
+  const limS = i => (D[i].last / D[i].y - 1 <= -(limDn - 0.0015) && D[i].last <= D[i].l);
   let qs = 0; for (let i = t - 1; i >= 0 && lim(i); i--) qs++;
+  let qss = 0; for (let i = t - 1; i >= 0 && limS(i); i--) qss++;
   let us = 0; for (let i = t - 1; i >= 1 && C[i] > C[i - 1]; i--) us++;
-  ind.buy_queue_streak_before_today = qs; ind.up_day_streak_before_today = us;
+  ind.buy_queue_streak_before_today = qs; ind.sell_queue_streak_before_today = qss; ind.up_day_streak_before_today = us;
   out.daily = ind;
 
   // ---------- 4) chart structure: swings, key levels, volume-by-price, anchored VWAP
@@ -351,12 +402,13 @@ async function petroSnapshot(symbol) {
   let queue = 'none';
   if (top.qTitMeDem > 0 && !top.qTitMeOf && pMax && top.pMeDem >= pMax) queue = 'buy_queue';
   if (top.qTitMeOf > 0 && !top.qTitMeDem && pMin && top.pMeOf <= pMin) queue = 'sell_queue';
-  out.order_book = { queue, top5: Bk.slice(0, 5).map(b => [b.zOrdMeDem, b.qTitMeDem, b.pMeDem, b.pMeOf, b.qTitMeOf, b.zOrdMeOf]),
+  if (REPLAY) out.order_book = { queue: 'unknown', note: 'در آزمون گذشته دفتر سفارش نیست' };
+  else out.order_book = { queue, top5: Bk.slice(0, 5).map(b => [b.zOrdMeDem, b.qTitMeDem, b.pMeDem, b.pMeOf, b.qTitMeOf, b.zOrdMeOf]),
     queue_value_billion_toman: R((queue === 'buy_queue' ? top.qTitMeDem * top.pMeDem : queue === 'sell_queue' ? top.qTitMeOf * top.pMeOf : 0) / 1e10, 1),
     note: 'ستون‌ها: تعداد خریدار، حجم خرید، قیمت خرید، قیمت فروش، حجم فروش، تعداد فروشنده' };
 
   // ---------- 6) flows (individual / institutional)
-  const CT = {}; (cth?.clientType || []).forEach(r => CT[r.recDate] = r);
+  const CT = {}; ctRows.forEach(r => { if (!REPLAY || r.recDate <= D[t].d) CT[r.recDate] = r; });
   if (ctToday?.clientType && (last.live || !CT[last.d])) { const q = ctToday.clientType, px = last.c; CT[last.d] = { buy_I_Value: q.buy_I_Volume * px, sell_I_Value: q.sell_I_Volume * px, buy_N_Value: q.buy_N_Volume * px, sell_N_Value: q.sell_N_Volume * px, buy_I_Count: q.buy_CountI, sell_I_Count: q.sell_CountI }; }
   const F = D.map(r => { const x = CT[r.d]; if (!x) return null; const bpc = x.buy_I_Value / Math.max(1, x.buy_I_Count), spc = x.sell_I_Value / Math.max(1, x.sell_I_Count);
     return { d: r.d, val: r.val, bpc, spc, power: bpc / spc, netI: x.buy_I_Value - x.sell_I_Value, nbuy: x.buy_N_Value, nsell: x.sell_N_Value, bc: x.buy_I_Count, sc: x.sell_I_Count }; });
@@ -397,19 +449,19 @@ async function petroSnapshot(symbol) {
   // ---------- 8) major holders (>1%)
   const cls = nm => /^شخص حقيقي/.test(nm) ? 'individual' : /BFM|بازارگرداني/.test(nm) ? 'market_maker' : /^PRX|سبد/.test(nm) ? 'portfolio' : /صندوق.*(بازنشستگي|بيمه اجتماعي)/.test(nm) ? 'pension' : /صندوق/.test(nm) ? 'fund' : /بيمه/.test(nm) ? 'insurance' : /بانك/.test(nm) ? 'bank' : /واسط مالي/.test(nm) ? 'sukuk_spv' : /تامين|شستا|صبا|آتيه/.test(nm) ? 'strategic_social_security' : /پتروشيمي|نفت|گاز|پالايش/.test(nm) ? 'strategic_parent_or_peer' : /سرمايه گذاري|گروه|توسعه/.test(nm) ? 'investment_co' : 'other';
   const hd = [];
-  for (const r of D.slice(-6)) { const j = await J(`Shareholder/${ic}/${r.d}`, 2, 10000); const rows = j?.shareShareholder || []; const des = [...new Set(rows.map(x => x.dEven))].sort(); if (des.length < 2) continue;
+  for (const r of (opts.lite ? [] : D.slice(-6))) { const j = await J(`Shareholder/${ic}/${r.d}`, 2, 10000); const rows = j?.shareShareholder || []; const des = [...new Set(rows.map(x => x.dEven))].sort(); if (des.length < 2) continue;
     const cur = {}, prev = {}; rows.forEach(x => { const T = x.dEven === des[des.length - 1] ? cur : prev; T[x.shareHolderName] = (T[x.shareHolderName] || 0) + x.numberOfShares; });
     for (const nm of new Set([...Object.keys(cur), ...Object.keys(prev)])) { const dsh = (cur[nm] || 0) - (prev[nm] || 0); if (Math.abs(dsh) < 1) continue;
       hd.push({ date: r.d, holder: nm, type: cls(nm), delta_shares: dsh, value_billion_toman: R(dsh * r.c / 1e10, 2), now_pct: I.zTitad ? R(100 * (cur[nm] || 0) / I.zTitad, 3) : null, new_above_1pct: !(nm in prev), dropped_below_1pct: !(nm in cur) }); } }
-  const lastHold = await J(`Shareholder/GetInstrumentShareHolderLast/${ic}`, 2);
+  const lastHold = (REPLAY || opts.lite) ? null : await J(`Shareholder/GetInstrumentShareHolderLast/${ic}`, 2);
   out.holders = { top: (lastHold?.shareHolder || []).slice(0, 8).map(x => [x.shareHolderName, R(x.perOfShares, 2), cls(x.shareHolderName)]), changes_6d: hd };
 
   // ---------- 9) the symbol's own group (sector code from InstrumentInfo, e.g. 44 = chemicals, 23 = refineries):
   //               breadth, flows EXCLUDING this symbol, group index (found by name "<code>-...") + total index, live append
   const SEC = String(I.sector?.cSecVal || '').trim() || '44';
-  const mw = await J('ClosingPrice/GetMarketWatch?market=0&paperTypes[0]=1&paperTypes[1]=2&showTraded=false&withBestLimits=true');
+  const mw = REPLAY ? null : await J('ClosingPrice/GetMarketWatch?market=0&paperTypes[0]=1&paperTypes[1]=2&showTraded=false&withBestLimits=true');
   const G = (mw?.marketwatch || []).filter(x => (x.csv || '').trim() === SEC && (x.flow == null || [1, 2, 4].includes(x.flow)) && !/\d$/.test(x.lva) && x.qtc > 0);
-  const cta = await J('ClientType/GetClientTypeAll'); const CTA = {}; (cta?.clientTypeAllDto || []).forEach(x => CTA[x.insCode] = x);
+  const cta = REPLAY ? null : await J('ClientType/GetClientTypeAll'); const CTA = {}; (cta?.clientTypeAllDto || []).forEach(x => CTA[x.insCode] = x);
   let netI = 0, tv = 0, selfNet = 0, selfVal = 0;
   G.forEach(x => { const c = CTA[x.insCode]; if (!c) return; const nI = (c.buy_I_Volume - c.sell_I_Volume) * x.pcl; if (x.insCode === ic) { selfNet = nI; selfVal = x.qtc; } else { netI += nI; tv += x.qtc; } });
   const qb = G.filter(x => x.pdv >= x.pMax && x.blDs?.[0]?.qmo === 0).length, qsl = G.filter(x => x.pdv <= x.pMin && x.blDs?.[0]?.qmd === 0).length;
@@ -420,24 +472,41 @@ async function petroSnapshot(symbol) {
   if (!secIdx && SEC !== '44') out.warnings.push(`شاخص گروه ${SEC} پیدا نشد؛ شاخص ۴۴ به‌جای آن استفاده شد`);
   const [ixG, ixT] = await Promise.all([J('Index/GetIndexB2History/' + GI), J('Index/GetIndexB2History/32097828799138957')]);
   const liveIdx = {}; liveList.forEach(x => liveIdx[x.insCode] = x.xDrNivJIdx004);
-  const idx = (h, code) => { const rows = (h?.indexB2 || []).sort((x, y) => x.dEven - y.dEven); const a = rows.map(x => x.xNivInuClMresIbs); let appended = false;
-    if (last.d > (rows[rows.length - 1]?.dEven || 0) && liveIdx[code]) { a.push(liveIdx[code]); appended = true; }
+  const idx = (h, code) => { const rows = (h?.indexB2 || []).sort((x, y) => x.dEven - y.dEven).filter(x => !REPLAY || x.dEven <= last.d); const a = rows.map(x => x.xNivInuClMresIbs); let appended = false;
+    if (!REPLAY && last.d > (rows[rows.length - 1]?.dEven || 0) && liveIdx[code]) { a.push(liveIdx[code]); appended = true; }
     const k = a.length - 1; const m50 = a.slice(k - 49, k + 1).reduce((s, x) => s + x, 0) / 50; return { level: a[k], r1: R(a[k] / a[k - 1] - 1), r5: R(a[k] / a[k - 5] - 1), r20: R(a[k] / a[k - 20] - 1), above_sma50: a[k] > m50, live_appended: appended }; };
   const cG = idx(ixG, GI);
   const regime = cG.r20 > 0.10 ? 'hot' : cG.r20 < -0.05 ? 'cold' : 'mid';
-  out.group = { sector_code: SEC, sector_name: I.sector?.lSecVal || null, group_index_name: secIdx?.lVal30 || '44-شيميايي',
+  out.group = { sector_code: SEC, sector_name: I.sector?.lSecVal || null, group_index_name: secIdx?.lVal30 || '44-شيميايي', group_index_code: GI,
     n_traded: G.length, pct_up: R(G.filter(x => x.pdv > x.py).length / G.length, 2), buy_queues: qb, sell_queues: qsl,
     avg_change_pct: R(100 * G.reduce((s, x) => s + (x.pcl / x.py - 1), 0) / G.length, 2),
     indiv_net_flow_pct_of_value_ex_self: R(netI / tv, 3), indiv_net_flow_billion_toman_ex_self: R(netI / 1e10, 1),
     this_symbol_share_of_group_value: R(selfVal / (tv + selfVal), 3), this_symbol_indiv_net_billion_toman: R(selfNet / 1e10, 1),
     group_index: cG, chem44_index: SEC === '44' ? cG : null, total_index: idx(ixT, '32097828799138957'), regime,
     regime_rule: 'hot = شاخص همین گروه در ۲۰ روز بیش از +۱۰٪؛ cold = کمتر از −۵٪؛ بقیه mid' };
-  if (SEC !== '44') out.warnings.push(`نماد در گروه ${SEC} (${I.sector?.lSecVal || ''}) است، نه گروه ۴۴: جدول کالیبراسیون روی گروه ۴۴ برآورد شده و برای این نماد آزموده نشده (اطمینان پایین)`);
+  if (SEC !== '44' && SEC !== '23') out.warnings.push(`نماد در گروه ${SEC} (${I.sector?.lSecVal || ''}) است، نه گروه ۴۴ یا ۲۳: جدول‌ها روی این گروه آزموده نشده‌اند (اطمینان پایین)`);
+  if (SEC === '23') out.warnings.push('گروه ۲۳ (پالایشی): جدول ۵ روزهٔ rubric از گروه ۴۴ است؛ پیش‌بینی جلسهٔ بعد و اعداد ۵ روزهٔ همین گروه در بلوک next_session است (آزمون ۱۴ سالهٔ ۱۱ پالایشی، نسخهٔ ۲٫۴)');
+  // breadth of the other refiners today (v2.4 rows): share closing in buy / sell queue, share up
+  const REFINERS = { 'شپنا': ['7745894403636165'], 'شتران': ['51617145873056483', '34066377223628725'], 'شبندر': ['35366681030756042'], 'شبریز': ['48753732042176709'],
+    'شسپا': ['49188729526980541'], 'شراز': ['14031158866706953', '33683240001985963'], 'شاوان': ['60247433951600827'], 'شرانل': ['44013656953678055'],
+    'شنفت': ['14073782708315535'], 'شپاس': ['35178706978554988'], 'شبهرن': ['22667016906590506'] };
+  const faN = x => String(x || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim(), me = faN(symbol);
+  if (SEC === '23') {
+    let peers = null;
+    if (!REPLAY) { const Pp = G.filter(x => faN(x.lva) !== me && REFINERS[faN(x.lva)]);
+      if (Pp.length) peers = { n: Pp.length, buy_queue_share: R(Pp.filter(x => x.pdv >= x.pMax && x.blDs?.[0]?.qmo === 0).length / Pp.length, 2),
+        sell_queue_share: R(Pp.filter(x => x.pdv <= x.pMin && x.blDs?.[0]?.qmd === 0).length / Pp.length, 2), up_share: R(Pp.filter(x => x.pcl > x.py).length / Pp.length, 2), source: 'دیده‌بان بازار' }; }
+    else { const rows = await Promise.all(Object.entries(REFINERS).filter(([k]) => k !== me).map(async ([, ics]) => { for (const pic of ics) { const j = await J(`ClosingPrice/GetClosingPriceDaily/${pic}/${last.d}`, 2, 10000); const r = j?.closingPriceDaily; if (r && r.qTotTran5J > 0) return r; } return null; }));
+      const Pp = rows.filter(Boolean), q = r => r.pDrCotVal / r.priceYesterday - 1;
+      if (Pp.length) peers = { n: Pp.length, buy_queue_share: R(Pp.filter(r => q(r) >= limUp - 0.0015 && r.pDrCotVal >= r.priceMax).length / Pp.length, 2),
+        sell_queue_share: R(Pp.filter(r => q(r) <= -(limDn - 0.0015) && r.pDrCotVal <= r.priceMin).length / Pp.length, 2), up_share: R(Pp.filter(r => r.pClosing > r.priceYesterday).length / Pp.length, 2), source: 'تاریخچهٔ همتایان در تاریخ آزمون' }; }
+    out.group.refiner_peers_today = peers;
+  }
 
   // ---------- 10) today's intraday (5-minute bars) — with timeout, optional
-  const tr = await J(`Trade/GetTrade/${ic}`, 2, 12000); const T5 = {};
-  if (!tr) out.warnings.push('دادهٔ معاملات درون‌روز امروز نیامد (timeout)');
-  (tr?.trade || []).filter(x => !x.canceled).sort((a, b) => a.nTran - b.nTran).forEach(x => { const s = Math.floor(x.hEven / 10000) * 60 + Math.floor(x.hEven / 100 % 100); const k = Math.max(0, Math.floor((s - 540) / 5)); const b = T5[k] ||= { o: x.pTran, h: x.pTran, l: x.pTran, c: x.pTran, v: 0, val: 0 }; b.h = Math.max(b.h, x.pTran); b.l = Math.min(b.l, x.pTran); b.c = x.pTran; b.v += x.qTitTran; b.val += x.qTitTran * x.pTran; });
+  const tr = opts.lite ? null : await J(REPLAY ? `Trade/GetTradeHistory/${ic}/${last.d}/false` : `Trade/GetTrade/${ic}`, 2, 12000); const T5 = {};
+  if (!tr && !opts.lite) out.warnings.push('دادهٔ معاملات درون‌روز امروز نیامد (timeout)');
+  (tr?.trade || tr?.tradeHistory || []).filter(x => !x.canceled).sort((a, b) => a.nTran - b.nTran).forEach(x => { const s = Math.floor(x.hEven / 10000) * 60 + Math.floor(x.hEven / 100 % 100); const k = Math.max(0, Math.floor((s - 540) / 5)); const b = T5[k] ||= { o: x.pTran, h: x.pTran, l: x.pTran, c: x.pTran, v: 0, val: 0 }; b.h = Math.max(b.h, x.pTran); b.l = Math.min(b.l, x.pTran); b.c = x.pTran; b.v += x.qTitTran; b.val += x.qTitTran * x.pTran; });
   const ks = Object.keys(T5).map(Number).sort((a, b) => a - b); const hm = k => `${String(9 + Math.floor(k * 5 / 60)).padStart(2, '0')}:${String(k * 5 % 60).padStart(2, '0')}`;
   if (ks.length) { const vw = ks.reduce((s, k) => s + T5[k].val, 0) / ks.reduce((s, k) => s + T5[k].v, 0); const lastP = T5[ks[ks.length - 1]].c;
     const pAt = m => { const k = ks.filter(k => k < m / 5); return k.length ? T5[k[k.length - 1]].c : null; };
@@ -482,7 +551,140 @@ async function petroSnapshot(symbol) {
     applicable: !newIPO, calibrated_on_group: '44', calibration_applies_to_this_group: SEC === '44',
     note: newIPO ? 'سهم تازه‌عرضه است: جدول کالیبراسیون قابل‌اتکا نیست؛ از بلوک ipo استفاده کن' : 'امتیاز کدال را اضافه کن و باند را دوباره تعیین کن؛ لبه = اختلاف با نرخ پایهٔ همین رژیم',
     tradability: d.closed_at_upper_limit ? 'در صف خرید بسته شده — خرید عملاً ممکن نیست' : d.closed_at_lower_limit ? 'در صف فروش بسته شده — فروش عملاً ممکن نیست' : 'قابل معامله' };
+
+  // ---------- 12) Codal letters from tsetmc (no codal.ir rate limit): recent list + the two Codal rows of the v2.4 score
+  const clk = s => { const m = String(s || '').match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; };
+  const at1230 = dEv => { const x = String(dEv); return Date.UTC(+x.slice(0, 4), +x.slice(4, 6) - 1, +x.slice(6, 8), 12, 30); };
+  const nextOpen = REPLAY ? (out.replay.next_session_dEven ? at1230(out.replay.next_session_dEven) - 4 * 3600e3 : at1230(last.d) + 20 * 3600e3) : Infinity;
+  const cdl = await J(`Codal/GetPreparedDataByInsCode/${REPLAY ? 5000 : 60}/${ic}`, 2, 15000);
+  const CL = (cdl?.preparedData || []).map(x => ({ t: clk(x.publishDateTime_Gregorian), when: String(x.publishDateTime_Gregorian || '').replace('T', ' ').slice(0, 16), type: codalClassify(x.title), title: String(x.title || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک') }))
+    .filter(x => x.t && x.t <= nextOpen).sort((a, b) => b.t - a.t);
+  const tClose = at1230(last.d), prevClose = t ? at1230(D[t - 1].d) : tClose - 864e5;
+  const cdRows = { capinc_night: CL.some(x => x.t > tClose && ['CAPINC_PROPOSAL', 'CAPINC_STEP', 'EGM'].includes(x.type)), interim_today: CL.some(x => x.t > prevClose && x.t <= tClose && x.type === 'INTERIM_FS') };
+  out.codal_recent = cdl ? { source: 'فهرست کدال در tsetmc', letters: CL.slice(0, 15).map(x => [x.when, x.type, x.title]), v24_rows: cdRows,
+    note: 'زمان‌ها به وقت تهران. «بعد از جلسه» یعنی بعد از ۱۲:۳۰ روز آخر و قبل از بازگشایی بعدی.' } : { error: 'فهرست کدال از tsetmc نیامد' };
+
+  // ---------- 13) next-session forecast (v2.4): score and table estimated on the 11 refiners, 1392-1405 (research/ in the repo)
+  {
+    const V24 = { strong: 3, weak: -3, buyq: 3, sellq: -2, smart: 2, buyq_lowvol: 2, buyq_run2: 1, sellq_lowvol: -1, sellq_run2: -1, rsi30: -1, boll: 1, bp05: -1,
+      grp_buyq50: 1, grp_sellq50: -1, total_dn1: 1, drop_noq: 1, vol_low: -1, wide_range: -1, capinc_night: 1, interim_today: -1 };
+    const vr = d.vol_ratio_20, pr = out.group.refiner_peers_today, lmc = d.last_minus_close_pct, uq = !!d.closed_at_upper_limit, dq = !!d.closed_at_lower_limit;
+    const on = { strong: lmc > 1, weak: lmc < -1, buyq: uq, sellq: dq, smart: P.smart_retail_money > 0, buyq_lowvol: uq && vr !== null && vr < 0.7, buyq_run2: uq && d.buy_queue_streak_before_today >= 2,
+      sellq_lowvol: dq && vr !== null && vr < 0.7, sellq_run2: dq && d.sell_queue_streak_before_today >= 2, rsi30: P.rsi_below_30 < 0, boll: P.above_upper_bollinger > 0, bp05: P.buyer_power_lt05 < 0,
+      grp_buyq50: !!pr && pr.buy_queue_share >= 0.5, grp_sellq50: !!pr && pr.sell_queue_share >= 0.5, total_dn1: (out.group.total_index?.r1 ?? 0) < -0.01,
+      drop_noq: d.chg_close_pct < -2 && !dq, vol_low: vr !== null && vr < 0.5, wide_range: limUp >= 0.06, capinc_night: cdRows.capinc_night, interim_today: cdRows.interim_today };
+    const pts = {}; let sc = 0; for (const k of Object.keys(V24)) if (on[k]) { pts[k] = V24[k]; sc += V24[k]; }
+    const bd = sc <= -6 ? '<=-6' : sc <= -4 ? '-5..-4' : sc <= -2 ? '-3..-2' : sc <= 1 ? '-1..+1' : sc <= 3 ? '+2..+3' : sc <= 5 ? '+4..+5' : '>=+6';
+    // [n, up>0.5%, flat ±0.5%, down<-0.5%, up(>0)%, median next-day %, median gap %, next buy queue %, next sell queue %,
+    //  median from today's LAST price to tomorrow's پایانی % (rows not in a buy queue), median from the last price to 5 sessions later %, up in 5 %, median 5-day %]
+    const TAB = { '<=-6': [1621, 6, 39, 55, 9, -0.67, -2.98, 4, 55, 1.12, 0.29, 22, -2.08], '-5..-4': [3318, 11, 38, 51, 17, -0.54, -1.66, 4, 18, 0.98, 0.62, 33, -1.18],
+      '-3..-2': [4795, 18, 36, 46, 29, -0.39, -0.56, 5, 12, 0.14, 0.00, 41, -0.63], '-1..+1': [12017, 34, 34, 33, 48, 0.00, 0.14, 8, 5, 0.03, 0.18, 51, 0.14],
+      '+2..+3': [2835, 56, 27, 17, 71, 0.76, 1.59, 17, 4, -0.40, 0.00, 62, 1.27], '+4..+5': [1911, 69, 15, 16, 78, 2.03, 2.76, 35, 6, -0.32, 0.05, 68, 2.86],
+      '>=+6': [2662, 84, 9, 7, 90, 2.94, 2.99, 61, 3, -0.14, 1.05, 80, 6.38] };
+    const T = TAB[bd], call = T[1] >= 50 ? 'UP' : T[3] >= 45 ? 'DOWN' : 'NONE';
+    const adj7 = (d.adjustments_last_year || []).some(a => (Date.UTC(+String(last.d).slice(0, 4), +String(last.d).slice(4, 6) - 1, +String(last.d).slice(6, 8)) - Date.UTC(+String(a[0]).slice(0, 4), +String(a[0]).slice(4, 6) - 1, +String(a[0]).slice(6, 8))) / 864e5 <= 7);
+    const sit = newIPO ? 'A' : adj7 ? 'B' : hist < 60 ? 'C' : 'D';
+    const flags = [];
+    if (limUp <= 0.02) flags.push(`دامنهٔ نوسان باریک (±${Math.round(limUp * 100)}٪): در آزمون ۵۶٪ جلسه‌های بعد بی‌حرکت (±۰٫۵٪) بود`);
+    if (REPLAY && out.replay.next_session_dEven) { const gd = (at1230(out.replay.next_session_dEven) - tClose) / 864e5; if (gd >= 4) flags.push(`فاصلهٔ ${Math.round(gd)} روزه تا جلسهٔ بعد: خطای جهت در این حالت ۲۰٪ بود (در برابر ۱۳٪)`); }
+    if (uq) flags.push(`صف خرید: فردا دوباره صف خرید ${d.buy_queue_streak_before_today >= 4 ? '۷۸' : d.buy_queue_streak_before_today >= 2 ? '۷۲' : vr !== null && vr > 1.5 ? '۴۱' : '۴۱ تا ۵۲'}٪، صف فروش حدود ۴٪ (با افت شبانهٔ دلار بیش از ۱٪: ۱۲٪)`);
+    if (dq) flags.push(`صف فروش: فردا دوباره صف فروش ${d.sell_queue_streak_before_today >= 2 ? '۶۷' : vr !== null && vr > 1.5 ? '۴۱' : '۳۹ تا ۴۹'}٪، صف خرید حدود ۷٪ (در ۱۴۰۳ تا ۱۴۰۵: ۱۲٪)`);
+    out.next_session = { version: '2.4', applies: SEC === '23' && sit === 'D', situation: sit, calibrated_on: '۱۱ نماد پالایشی گروه ۲۳، ۱۳۹۲ تا ۱۴۰۵ (حدود ۲۹ هزار روز-نماد)',
+      points: pts, score: sc, band: bd, call, prob: { up: T[1] / 100, flat: T[2] / 100, down: T[3] / 100, up_any: T[4] / 100 }, n: T[0],
+      expected: { next_close_median_pct: T[5], open_gap_median_pct: T[6], next_buy_queue_pct: T[7], next_sell_queue_pct: T[8], from_last_price_to_next_close_median_pct: T[9],
+        from_last_price_to_5d_median_pct: T[10], up_in_5d_pct: T[11], five_day_median_pct: T[12], round_trip_cost_pct: 1.25 },
+      can_buy_now: !uq, can_sell_now: !dq, confidence_flags: flags,
+      walk_forward: 'آزمون خارج از نمونه (هر سال فقط با سال‌های قبل): وقتی پیش‌بینی جهت داد و حرکت بی‌حرکت نبود، ۸۱ تا ۸۵٪ درست بود؛ خلاف جهت ۱۰ تا ۱۵٪؛ بی‌حرکت ۶ تا ۳۸٪ (۱۴۰۳ تا ۱۴۰۵)',
+      note: SEC === '23' ? (sit === 'D' ? 'قیمت «پایانی» یعنی میانگین وزنی روز؛ بخش بزرگ این پیش‌بینی از فاصلهٔ آخرین قیمت امروز با پایانی می‌آید و قبل از فردا در قیمت هست. از آخرین قیمت امروز، حرکت مورد انتظار در همهٔ ناحیه‌ها از هزینهٔ رفت‌وبرگشت ۱٫۲۵٪ کمتر است.' : 'موقعیت غیرعادی (A/B/C): جدول معتبر نیست')
+        : 'این جدول روی پالایشی‌ها برآورد شده؛ برای این گروه آزموده نشده. برای جلسهٔ بعد از rubric.calibration_for_this_band.p_up_1d استفاده کن.' };
+  }
   return out;
+}
+
+/* ------------------------------------------------------------------------
+   B1) petroReplay(symbol, date) — the replay test: "forecast for date X, check it on the next session".
+   snapshot = petroSnapshot as of the close of X (nothing after X is used, only the date of the next session);
+   outcome  = what really happened next; check = the next-session call and the v2.3 decision against it,
+   with automatic reasons for a miss. Write the sheet from `snapshot` first, then read outcome/check (blind test). */
+async function petroReplay(symbol, date, opts = {}) {
+  const snap = await petroSnapshot(symbol, { ...opts, asOf: date });
+  if (!snap || snap.error) return { symbol, as_of: date, error: (snap && snap.error) || 'snapshot failed' };
+  const BASE = 'https://cdn.tsetmc.com/api/', cache = opts.cache || null;
+  const J = async u => { if (cache && cache.has(u)) return cache.get(u);
+    for (let i = 0; i < 3; i++) { try { const r = await fetch(BASE + u); if (r.ok) { const j = await r.json(); if (cache) cache.set(u, j); return j; } } catch (e) { /* retry */ } await new Promise(r => setTimeout(r, 800 * (i + 1))); } return null; };
+  const R = (x, dd = 2) => (x === null || x === undefined || !isFinite(x)) ? null : Math.round(x * 10 ** dd) / 10 ** dd;
+  const jalOf = dEv => { const x = String(dEv); return new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.UTC(+x.slice(0, 4), +x.slice(4, 6) - 1, +x.slice(6, 8)))).replace(/[^\d/]/g, ''); };
+  const utc = (dEv, hh = 0, mm = 0) => { const x = String(dEv); return Date.UTC(+x.slice(0, 4), +x.slice(4, 6) - 1, +x.slice(6, 8), hh, mm); };
+  const ic = snap.instrument.insCode, d0 = snap.replay.session_used_dEven;
+  const dl = await J(`ClosingPrice/GetClosingPriceDailyList/${ic}/0`);
+  const rows = (dl?.closingPriceDaily || []).filter(r => r.qTotTran5J > 0).sort((a, b) => a.dEven - b.dEven);
+  const i0 = rows.findIndex(r => r.dEven === d0);
+  if (i0 < 0 || i0 === rows.length - 1) return { symbol, as_of: date, snapshot: snap, error: i0 < 0 ? 'روز آزمون در سابقه پیدا نشد' : 'هنوز جلسهٔ بعدی نیامده' };
+  // adjustment from day X forward (a dividend or capital increase after X must not look like a fall)
+  const fac = []; let fc = 1; for (let i = rows.length - 1; i >= i0; i--) { fac[i] = fc; if (i > i0) { let q = rows[i].priceYesterday / rows[i - 1].pClosing; if (q > 0.995 && q < 1.005) q = 1; fc *= q; } }
+  const C = i => rows[i].pClosing * fac[i], r0 = rows[i0], n1 = rows[i0 + 1];
+  const ret = k => i0 + k < rows.length ? C(i0 + k) / C(i0) - 1 : null, lastX = r0.pDrCotVal * fac[i0];
+  const fromLast = k => i0 + k < rows.length ? C(i0 + k) / lastX - 1 : null;
+  const th = await J(`MarketData/GetStaticThreshold/${ic}/${n1.dEven}`); const rec = (th?.staticThreshold || []).filter(x => x.dEven === n1.dEven).sort((a, b) => a.hEven - b.hEven).pop();
+  const nq = rec ? (n1.pDrCotVal >= rec.psGelStaMax ? 'buy_queue' : n1.pDrCotVal <= rec.psGelStaMin ? 'sell_queue' : 'none') : 'unknown';
+  const nLim = rec ? [R(1 - rec.psGelStaMin / n1.priceYesterday, 3), R(rec.psGelStaMax / n1.priceYesterday - 1, 3)] : null;
+  const ixNext = async code => { const h = await J('Index/GetIndexB2History/' + code); const a = (h?.indexB2 || []).sort((x, y) => x.dEven - y.dEven); const k = a.findIndex(x => x.dEven === d0);
+    return k >= 0 && k + 1 < a.length && a[k + 1].dEven === n1.dEven ? a[k + 1].xNivInuClMresIbs / a[k].xNivInuClMresIbs - 1 : null; };
+  const [gN, tN] = await Promise.all([ixNext(snap.group.group_index_code), ixNext('32097828799138957')]);
+  const cdl = await J(`Codal/GetPreparedDataByInsCode/5000/${ic}`);
+  const clk = x => { const m = String(x || '').match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; };
+  const news = (cdl?.preparedData || []).map(x => ({ t: clk(x.publishDateTime_Gregorian), type: codalClassify(x.title), title: String(x.title || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک'), when: String(x.publishDateTime_Gregorian || '').replace('T', ' ').slice(0, 16) }))
+    .filter(x => x.t && x.t > utc(d0, 12, 30) && x.t <= utc(n1.dEven, 12, 30));
+  const r1 = ret(1), gap = n1.priceFirst * fac[i0 + 1] / C(i0) - 1, gapDays = Math.round((utc(n1.dEven) - utc(d0)) / 864e5);
+  const outcome = { next_session: jalOf(n1.dEven), days_until_next_session: gapDays, next_close_pct: R(100 * r1), open_gap_pct: R(100 * gap),
+    next_high_pct: R(100 * (n1.priceMax * fac[i0 + 1] / C(i0) - 1)), next_low_pct: R(100 * (n1.priceMin * fac[i0 + 1] / C(i0) - 1)), next_queue: nq, next_price_limits_pct: nLim,
+    from_last_price_to_next_close_pct: R(100 * fromLast(1)), ret_3d_pct: R(100 * ret(3)), ret_5d_pct: R(100 * ret(5)), from_last_price_to_5d_pct: R(100 * fromLast(5)),
+    group_index_next_pct: R(100 * gN), total_index_next_pct: R(100 * tN), adjusted_next_day: Math.abs(n1.priceYesterday / r0.pClosing - 1) > 0.005,
+    news_until_next_close: news.slice(0, 8).map(x => [x.when, x.type, x.title]) };
+  // check
+  const cls = x => x === null ? null : x > 0.005 ? 'UP' : x < -0.005 ? 'DOWN' : 'FLAT';
+  const ns = snap.next_session || {}, real = cls(r1), side = ns.call === 'UP' ? 1 : ns.call === 'DOWN' ? -1 : 0;
+  const verdict = !side ? 'NO_CALL' : real === 'FLAT' ? 'FLAT' : (real === ns.call ? 'RIGHT' : 'WRONG');
+  const tags = [];
+  if (verdict === 'WRONG' || verdict === 'FLAT') {
+    const opp = x => x !== null && x * side < 0;
+    if (opp(gN) && Math.abs(gN) >= 0.01) tags.push('GROUP_MOVE'); if (opp(tN) && Math.abs(tN) >= 0.01) tags.push('MARKET_MOVE'); if (opp(gap) && Math.abs(gap) >= 0.015) tags.push('GAP');
+    const dq = snap.daily || {}; if ((dq.closed_at_upper_limit && side > 0 && nq !== 'buy_queue') || (dq.closed_at_lower_limit && side < 0 && nq !== 'sell_queue')) tags.push('QUEUE_FLIP');
+    if (nLim && dq.price_limits_pct && Math.abs(nLim[1] - dq.price_limits_pct[1]) > 0.004) tags.push('RANGE_CHANGE'); if (gapDays >= 4) tags.push('LONG_BREAK'); if (news.length) tags.push('NEWS');
+    if (outcome.adjusted_next_day) tags.push('ADJUSTMENT'); if (verdict === 'FLAT') tags.push('SMALL_MOVE'); if (!tags.length) tags.push('OWN');
+  }
+  const rb = snap.rubric || {}, cal = rb.calibration_for_this_band || {}, edge = rb.edge_vs_base_5d_pp;
+  const dec = !rb.applicable ? 'NA' : (edge >= 8 && cal.p_up_5d >= 0.55 && !(snap.daily || {}).closed_at_upper_limit) ? 'BUY' : (edge <= -8 && cal.p_up_5d <= 0.40 && !(snap.daily || {}).closed_at_lower_limit) ? 'SELL' : 'NO_EDGE';
+  const r5 = ret(5);
+  const check = { next_session_call: ns.call || null, next_session_band: ns.band || null, real_next: real, verdict, reasons: tags,
+    v23_decision: dec, v23_decision_right_5d: dec === 'BUY' ? (r5 === null ? null : r5 > 0) : dec === 'SELL' ? (r5 === null ? null : r5 <= 0) : null,
+    one_day_trade_from_last_net_pct: ns.can_buy_now === false || fromLast(1) === null ? null : R(100 * fromLast(1) - 1.25),
+    reason_help: { GROUP_MOVE: 'کل پالایشی‌ها خلاف جهت رفتند (≥۱٪)', MARKET_MOVE: 'شاخص کل خلاف جهت رفت (≥۱٪)', GAP: 'گپ بازگشایی خلاف جهت (≥۱٫۵٪)', QUEUE_FLIP: 'صف امروز فردا شکست',
+      RANGE_CHANGE: 'دامنهٔ نوسان عوض شد', LONG_BREAK: 'فاصلهٔ ۴ روز یا بیشتر تا جلسهٔ بعد', NEWS: 'اطلاعیهٔ کدال بعد از پایان جلسه', ADJUSTMENT: 'تعدیل قیمت (مجمع/افزایش سرمایه)', SMALL_MOVE: 'حرکت کمتر از ±۰٫۵٪', OWN: 'علت بیرونی پیدا نشد؛ حرکت خود سهم' } };
+  return { symbol, as_of: snap.replay.as_of, session_used: snap.replay.session_used, snapshot: snap, outcome, check };
+}
+
+/* B2) petroReplayRange(symbol, from, to) — petroReplay for every session between two dates (max 60), with a summary.
+   Lite mode (no holders, no intraday); histories are fetched once and shared. */
+async function petroReplayRange(symbol, from, to, opts = {}) {
+  const lat = x => String(x || '').replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).trim().split(/[/-]/).map((p, i) => i ? p.padStart(2, '0') : p).join('/');
+  const F = lat(from), T = lat(to), cache = new Map(), max = opts.max || 60;
+  const first = await petroReplay(symbol, T, { lite: true, cache });
+  if (first.error && !first.snapshot) return first;
+  const ic = first.snapshot.instrument.insCode, dl = cache.get(`ClosingPrice/GetClosingPriceDailyList/${ic}/0`);
+  const jalOf = dEv => { const x = String(dEv); return new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.UTC(+x.slice(0, 4), +x.slice(4, 6) - 1, +x.slice(6, 8)))).replace(/[^\d/]/g, ''); };
+  const days = (dl?.closingPriceDaily || []).filter(r => r.qTotTran5J > 0).map(r => jalOf(r.dEven)).filter(j => j >= F && j <= T).sort().slice(-max);
+  const rows = [];
+  for (const j of days) { const x = j === first.as_of ? first : await petroReplay(symbol, j, { lite: true, cache });
+    if (x.error) { rows.push({ date: j, error: x.error }); continue; }
+    const ns = x.snapshot.next_session || {};
+    rows.push({ date: j, next: x.outcome.next_session, score: ns.score, band: ns.band, call: ns.call, p: ns.prob, real_next_pct: x.outcome.next_close_pct, gap_pct: x.outcome.open_gap_pct,
+      from_last_pct: x.outcome.from_last_price_to_next_close_pct, verdict: x.check.verdict, reasons: x.check.reasons, v23: x.check.v23_decision, v23_right_5d: x.check.v23_decision_right_5d, ret_5d_pct: x.outcome.ret_5d_pct }); }
+  const ok = rows.filter(r => !r.error), calls = ok.filter(r => r.verdict !== 'NO_CALL'), right = calls.filter(r => r.verdict === 'RIGHT').length, wrong = calls.filter(r => r.verdict === 'WRONG').length, flat = calls.filter(r => r.verdict === 'FLAT').length;
+  const why = {}; calls.filter(r => r.verdict === 'WRONG').forEach(r => r.reasons.forEach(t => { why[t] = (why[t] || 0) + 1; }));
+  return { symbol, from: F, to: T, sessions: ok.length, rows,
+    summary: { calls: calls.length, right, wrong, flat, right_pct_excl_flat: right + wrong ? Math.round(100 * right / (right + wrong)) : null, reasons_of_wrong: why,
+      note: 'RIGHT/WRONG = جهت جلسهٔ بعد (پایانی به پایانی)؛ FLAT = حرکت کمتر از ±۰٫۵٪. نتیجهٔ چند روز محدود نوسان زیادی دارد؛ آزمون ۱۴ ساله در بلوک next_session.walk_forward است.' } };
 }
 
 /* ------------------------------------------------------------------------
@@ -531,7 +733,7 @@ function codalClassify(t) {
     for (const [k, rx] of rules) if (rx.test(t)) return k; return 'OTHER';
 }
 
-async function codalSnapshot(symbol, days = 120) {
+async function codalSnapshot(symbol, days = 120, opts = {}) {
   const fa = s => (s || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim();
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const jal = dt => new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt).replace(/[^\d/]/g, '');
@@ -541,7 +743,11 @@ async function codalSnapshot(symbol, days = 120) {
   const J = async u => { for (let i = 0; i < 5; i++) { const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
       try { const r = await fetch(u, { signal: ctl.signal }); clearTimeout(tm); if (r.ok) return await r.json(); if (r.status === 429) { await sleep(4000 * 2 ** i); continue; } } catch (e) { clearTimeout(tm); } await sleep(1500 * (i + 1)); } return null; };
   const classify = codalClassify;
-  const now = new Date(), from = jal(new Date(now - days * 864e5)), to = jal(now);
+  // as-of (replay): the window ends on the test date ('1403/07/07')
+  let now = new Date();
+  if (opts.asOf) { const want = toDig(String(opts.asOf)).split(/[/-]/).map((p, i) => i ? p.padStart(2, '0') : p).join('/'); let dt = new Date(now);
+    for (let k = 0; k < 9000 && jal(dt) > want; k++) dt = new Date(dt - 864e5); now = dt; }
+  const from = jal(new Date(now - days * 864e5)), to = jal(now);
   const letters = []; const first = await J(q(fa(symbol), from, to, 1));
   if (!first) return { symbol, error: 'جست‌وجوی کدال پاسخ نداد (احتمالاً 429)؛ یک دقیقه بعد دوباره اجرا کن. نتیجهٔ خالی را «بدون اطلاعیه» تفسیر نکن' };
   letters.push(...(first?.Letters || []));
