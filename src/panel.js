@@ -699,7 +699,7 @@ const PetroWatch = (() => {
     return b;
   }
 
-  const api = { version: PW_VERSION, site: SITE, can: CAN, mount, open: () => toggle(true), close: () => toggle(false), toggle, renderInto, claudeText, prompt: PW_PROMPT, collectors: PC };
+  const api = { version: PW_VERSION, site: SITE, can: CAN, mount, open: () => toggle(true), close: () => toggle(false), toggle, renderInto, claudeText, prompt: PW_PROMPT, collectors: PC, planOf, report: pwMakeReport(PC, planOf, PW_NET) };
   return api;
 })();
 

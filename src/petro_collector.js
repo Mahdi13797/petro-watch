@@ -512,16 +512,9 @@ async function petroEvaluate(logs) {
 }
 
 /* ------------------------------------------------------------------------ */
-async function codalSnapshot(symbol, days = 120) {
-  const fa = s => (s || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim();
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
-  const jal = dt => new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt).replace(/[^\d/]/g, '');
-  const toDig = s => (s || '').replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c));
-  const q = (sym, from, to, page) => 'https://search.codal.ir/api/search/v2/q?&Audit=true&AuditorRef=-1&Category=-1&Childs=true&CompanyState=-1&CompanyType=-1&Consolidatable=true&IsNotAudited=false&Length=-1&LetterType=-1&Mains=true&NotAudited=true&NotConsolidatable=true&Publisher=false&TracingNo=-1&search=true&PageNumber=' + page + '&Symbol=' + encodeURIComponent(sym) + '&FromDate=' + encodeURIComponent(from) + '&ToDate=' + encodeURIComponent(to);
-  // search.codal.ir rate-limits bursts (HTTP 429): back off and space the calls
-  const J = async u => { for (let i = 0; i < 5; i++) { const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
-      try { const r = await fetch(u, { signal: ctl.signal }); clearTimeout(tm); if (r.ok) return await r.json(); if (r.status === 429) { await sleep(4000 * 2 ** i); continue; } } catch (e) { clearTimeout(tm); } await sleep(1500 * (i + 1)); } return null; };
-  const classify = t => {
+// letter type from its title (used by codalSnapshot and the daily report)
+function codalClassify(t) {
+  t = String(t || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک');
     if (/افشای اطلاعات/.test(t)) { const m = t.match(/\((.*)\)\s*منتهی/); const x = m ? m[1] : t;
       if (/دیوان|دادنامه|شورای رقابت|ابطال مصوب|ماده ۹۱/.test(x)) return 'REGULATORY_COURT';
       if (/سرویس/.test(x)) return 'UTILITY_RATES';
@@ -535,7 +528,19 @@ async function codalSnapshot(symbol, days = 120) {
       ['AGM_DECISION', /تصمیمات مجمع عمومی عادی سالیانه/], ['AGM_NOTICE', /دعوت به مجمع عمومی عادی سالیانه/], ['DIV_SCHEDULE', /زمانبندی پرداخت سود/],
       ['CAPINC_PROPOSAL', /پیشنهاد هیئت مدیره.*افزایش سرمایه/], ['CAPINC_STEP', /افزایش سرمایه/], ['EGM', /مجمع عمومی فوق العاده/], ['RUMOR_CLARIFY', /شفاف سازی در خصوص شایعه/],
       ['BOARD_CEO_CHANGE', /هیئت مدیره.*مدیر عامل|مدیر عامل/], ['HALT', /تعلیق نماد|توقف نماد/]];
-    for (const [k, rx] of rules) if (rx.test(t)) return k; return 'OTHER'; };
+    for (const [k, rx] of rules) if (rx.test(t)) return k; return 'OTHER';
+}
+
+async function codalSnapshot(symbol, days = 120) {
+  const fa = s => (s || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim();
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const jal = dt => new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt).replace(/[^\d/]/g, '');
+  const toDig = s => (s || '').replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c));
+  const q = (sym, from, to, page) => 'https://search.codal.ir/api/search/v2/q?&Audit=true&AuditorRef=-1&Category=-1&Childs=true&CompanyState=-1&CompanyType=-1&Consolidatable=true&IsNotAudited=false&Length=-1&LetterType=-1&Mains=true&NotAudited=true&NotConsolidatable=true&Publisher=false&TracingNo=-1&search=true&PageNumber=' + page + '&Symbol=' + encodeURIComponent(sym) + '&FromDate=' + encodeURIComponent(from) + '&ToDate=' + encodeURIComponent(to);
+  // search.codal.ir rate-limits bursts (HTTP 429): back off and space the calls
+  const J = async u => { for (let i = 0; i < 5; i++) { const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
+      try { const r = await fetch(u, { signal: ctl.signal }); clearTimeout(tm); if (r.ok) return await r.json(); if (r.status === 429) { await sleep(4000 * 2 ** i); continue; } } catch (e) { clearTimeout(tm); } await sleep(1500 * (i + 1)); } return null; };
+  const classify = codalClassify;
   const now = new Date(), from = jal(new Date(now - days * 864e5)), to = jal(now);
   const letters = []; const first = await J(q(fa(symbol), from, to, 1));
   if (!first) return { symbol, error: 'جست‌وجوی کدال پاسخ نداد (احتمالاً 429)؛ یک دقیقه بعد دوباره اجرا کن. نتیجهٔ خالی را «بدون اطلاعیه» تفسیر نکن' };

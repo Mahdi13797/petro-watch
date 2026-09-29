@@ -15,6 +15,7 @@ const installBase = cfg.public ? raw : '';
 const collector = read('src/petro_collector.js');
 const bridge = read('src/fetch-bridge.js');
 const chart = read('src/chart.js');
+const report = read('src/report.js');
 const panel = read('src/panel.js');
 const css = read('src/panel.css');
 const prompt = read('prompt/Petro_Agent_Prompt_FA_v2_3.md');
@@ -37,10 +38,11 @@ const PW_NET = pwMakeNet(PW_GM);
 // ---- collector (src/petro_collector.js, unchanged); its \`fetch\` is the bridge above
 const PC = (function (fetch) {
 ${collector}
-return { petroSnapshot, petroEvaluate, codalSnapshot, codalLetterText };
+return { petroSnapshot, petroEvaluate, codalSnapshot, codalLetterText, codalClassify };
 })(PW_NET.fetch);
 
 ${chart}
+${report}
 ${panel}
 })();
 `;

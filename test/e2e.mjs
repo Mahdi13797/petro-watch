@@ -197,6 +197,48 @@ try {
     check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
     await ctx.close();
   }
+  // ---------------------------------------------------------------- 5) daily report: collect in the browser, rebuild the page in Node
+  console.log('5) daily report (PetroWatch.report → report/build.mjs)');
+  {
+    const { ctx, page, errors } = await newPage(browser, { gm: true });
+    await page.goto('https://www.codal.ir/');
+    await page.addScriptTag({ content: userjs });
+    check(await page.evaluate(() => window.PetroWatch.report.run(['نمونه', 'ناموجود'], { codal: true })) === 'started', 'report started in the background');
+    await page.waitForFunction(() => /^(done|error)/.test(window.PetroWatch.report.status()), null, { timeout: 120000 });
+    const stt = await page.evaluate(() => window.PetroWatch.report.status());
+    check(/^done/.test(stt) && /top=نمونه/.test(stt) && /errors=ناموجود/.test(stt), 'report status: ' + stt);
+    const n = +stt.match(/chunks=(\d+)/)[1], lines = [];
+    for (let i = 1; i <= n; i++) lines.push(await page.evaluate(k => window.PetroWatch.report.chunk(k), i));
+    check(lines.every(l => l.length <= 1830), `${n} chunks, each short enough for one javascript call`);
+    const pl = await page.evaluate(() => window.PetroWatch.report.payload());
+    const r0 = pl.rows.find(r => r.sym === 'نمونه');
+    check(r0 && r0.codal && r0.codal.checked && r0.codal.pts === -1 && r0.rank === 1, 'light Codal check applied to the model signal (AGM decision −1) and ranking set');
+    const dir = OUT + 'report/'; fs.mkdirSync(dir, { recursive: true });
+    // simulate a copy with one corrupted chunk: the builder must name it
+    const bad = lines.slice(); bad[0] = bad[0].slice(0, -5) + 'AAAAA';
+    fs.writeFileSync(dir + 'bad.txt', bad.join('\n'));
+    const cp = require('node:child_process');
+    let badOut = ''; try { cp.execFileSync('node', [new URL('report/build.mjs', root).pathname, '--chunks', dir + 'bad.txt', '--out', dir + 'x.html']); } catch (e) { badOut = String(e.stdout); }
+    check(/BAD_CHUNKS: 1/.test(badOut), 'builder rejects a corrupted chunk: ' + badOut.trim());
+    fs.writeFileSync(dir + 'chunks.txt', lines.join('\n'));
+    const okOut = cp.execFileSync('node', [new URL('report/build.mjs', root).pathname, '--chunks', dir + 'chunks.txt', '--out', dir + 'report.html', '--file']).toString();
+    check(/^OK/.test(okOut), 'builder: ' + okOut.trim());
+    await ctx.close();
+    for (const dark of [false, true]) {
+      const v = await newPage(browser, { dark, width: dark ? 420 : 1200, height: 900 });
+      await v.page.route('https://report.test/', r => r.fulfill({ status: 200, body: fs.readFileSync(dir + 'report.html'), contentType: 'text/html' }));
+      await v.page.goto('https://report.test/');
+      await v.page.waitForTimeout(500);
+      check(await v.page.locator('[data-tchart] svg rect').count() > 150 && await v.page.locator('table.plan tbody tr').count() === 2, `report page renders table and chart (${dark ? 'dark, phone' : 'light, desktop'})`);
+      await v.page.locator('[data-tchart] [data-ch="layer"][data-v="ichi"]').first().click();
+      check(await v.page.locator('[data-tchart] svg polygon').count() > 20, 'report chart layers are interactive');
+      check(await v.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no horizontal page scroll');
+      await v.page.screenshot({ path: OUT + `5-report-${dark ? 'dark-phone' : 'light'}.png`, fullPage: true });
+      check(v.errors.length === 0, 'no page errors' + (v.errors.length ? ': ' + v.errors.join(' | ') : ''));
+      await v.ctx.close();
+    }
+    check(errors.length === 0, 'no page errors while collecting' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  }
 } finally { await browser.close(); }
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nall passed');
 process.exit(fails.length ? 1 : 0);

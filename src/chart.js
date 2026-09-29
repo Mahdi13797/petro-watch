@@ -44,11 +44,11 @@ const PWChart = (() => {
   }
 
   // ------------------------------------------------------------ static shell (controls + drawing box)
-  function html() {
+  function html(opts = {}) {
     return `<div class="tcw" data-tchart>
       <div class="tc-ctl"><div class="seg" role="group" aria-label="بازهٔ زمانی"><button data-ch="tf" data-v="D">روزانه</button><button data-ch="tf" data-v="W">هفتگی</button></div>
         <div class="seg" role="group" aria-label="طول نمودار" data-el="ranges"></div>
-        <span class="grow"></span><button class="btn sm" data-ch="png">دانلود تصویر</button><button class="btn sm" data-ch="copyimg">کپی تصویر</button></div>
+        <span class="grow"></span>${opts.exportButtons === false ? '' : '<button class="btn sm" data-ch="png">دانلود تصویر</button><button class="btn sm" data-ch="copyimg">کپی تصویر</button>'}</div>
       <div class="tc-layers" role="group" aria-label="لایه‌ها">${LAYERS.map(([k, lbl, cs]) => `<button class="lchip" data-ch="layer" data-v="${k}" aria-pressed="false">${cs.map(c => `<i style="background:var(${c})"></i>`).join('')}${lbl}</button>`).join('')}</div>
       <div class="tc-svg" dir="ltr"></div><div class="tc-tip" hidden></div>
       <p class="muted small tc-note" data-el="note"></p></div>`;
