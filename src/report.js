@@ -72,7 +72,11 @@ function pwMakeReport(PC, planOf, net) {
           queue_buy: !!d.closed_at_upper_limit, queue_sell: !!d.closed_at_lower_limit, score: r.subtotal_without_codal || 0, band: r.band_without_codal,
           regime: r.regime || (t.group && t.group.regime), situation: p.situation, signal_blocked: p.signal_blocked || null,
           adjusted_recently: (d.adjustments_last_year || []).filter(a => a[0] >= tehranInt(7)).map(a => a[1]), ev5: p.situation === 'D' ? R(cal5(r), 2) : null, p_up_5d: r.calibration_for_this_band && r.calibration_for_this_band.p_up_5d,
-          calib_group_ok: r.calibration_applies_to_this_group !== false, plan: p, codal: null };
+          calib_group_ok: r.calibration_applies_to_this_group !== false, plan: p, codal: null,
+          next: t.next_session ? { call: t.next_session.call, band: t.next_session.band, prob: t.next_session.prob, applies: t.next_session.applies } : null,
+          swing: t.swing ? { decision: t.swing.decision, priority: t.swing.priority, gate_open: t.swing.gate_open, reasons: t.swing.reasons_skip, applies: t.swing.applies,
+            stop_pct: t.swing.plan && t.swing.plan.stop_pct, stop: t.swing.plan && t.swing.plan.stop_if_entry_at_today_close, refs: t.swing.plan && t.swing.plan.reference_prices_7d,
+            size: t.swing.plan && t.swing.plan.position_pct_of_capital_at_1pct_risk } : null };
       });
       // 3) light Codal check for model signals only (5 s apart; one retry after 60 s on 429)
       if (opts.codal !== false) {
@@ -92,7 +96,7 @@ function pwMakeReport(PC, planOf, net) {
         const pl = x.plan, sell = pl.signal && pl.signal.side === 'sell';
         x.dist_to_trigger_pct = pl.trigger && x.close ? R(100 * (pl.trigger.level / x.close - 1), 2) : null;
         // outside the normal situation (reopening after an adjustment, short history) the model has no edge estimate: lowest priority
-        x.prio = sell ? 0 : x.situation !== 'D' ? 1 : pl.signal && pl.signal.side === 'buy' ? 3 : pl.trigger && pl.trigger.reachableTomorrow ? 2 : 1; });
+        x.prio = sell ? 0 : x.situation !== 'D' ? 1 : x.swing && x.swing.decision === 'BUY_SWING' ? (x.swing.priority === 'A' ? 5 : 4) : pl.signal && pl.signal.side === 'buy' ? 3 : pl.trigger && pl.trigger.reachableTomorrow ? 2 : 1; });
       const ranked = rows.filter(x => x.prio > 0).sort((a, b) => b.prio - a.prio || (b.ev5 ?? -99) - (a.ev5 ?? -99) || (a.dist_to_trigger_pct ?? 99) - (b.dist_to_trigger_pct ?? 99) || (b.value_today || 0) - (a.value_today || 0));
       ranked.forEach((x, i) => { x.rank = i + 1; });
       const topN = opts.top || 2, top = ranked.slice(0, topN).map(x => {
@@ -106,7 +110,7 @@ function pwMakeReport(PC, planOf, net) {
           warnings: t.warnings };
       });
       st.payload = { v: 1, tool: 'petro-watch-report', generated_at: new Date().toISOString(), today, last_trading_date: lastDate, session_date: nextSession(today),
-        no_session_today: live.length > 0 && withToday * 2 < live.length, symbols: syms, label: opts.label || null, rows, top, ranking_rule: 'buy signal > trigger reachable tomorrow > rest; then expected 5-day return from the calibration table; then distance to trigger' };
+        no_session_today: live.length > 0 && withToday * 2 < live.length, symbols: syms, label: opts.label || null, rows, top, ranking_rule: '7-session swing buy (A: weak finish, then B) > buy signal > trigger reachable tomorrow > rest; then expected 5-day return from the calibration table; then distance to trigger' };
       // 6) pack: gzip + base64 in 1800-char chunks, each with an FNV-1a checksum
       const json = JSON.stringify(st.payload); let fmt = 'j', b64;
       try { const gz = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip')); const buf = new Uint8Array(await new Response(gz).arrayBuffer());

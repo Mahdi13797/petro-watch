@@ -598,6 +598,37 @@ async function petroSnapshot(symbol, opts = {}) {
       note: SEC === '23' ? (sit === 'D' ? 'قیمت «پایانی» یعنی میانگین وزنی روز؛ بخش بزرگ این پیش‌بینی از فاصلهٔ آخرین قیمت امروز با پایانی می‌آید و قبل از فردا در قیمت هست. از آخرین قیمت امروز، حرکت مورد انتظار در همهٔ ناحیه‌ها از هزینهٔ رفت‌وبرگشت ۱٫۲۵٪ کمتر است.' : 'موقعیت غیرعادی (A/B/C): جدول معتبر نیست')
         : 'این جدول روی پالایشی‌ها برآورد شده؛ برای این گروه آزموده نشده. برای جلسهٔ بعد از rubric.calibration_for_this_band.p_up_1d استفاده کن.' };
   }
+
+  // ---------- 14) multi-day swing plan (v2.4): the rule that held in every year 1397-1405 on the refiners (research/swing.js)
+  //  gate: total index +10% or more in 20 sessions and not down today · stock: no buy/sell queue at today's close, RSI14 ≤ 80,
+  //  20-day return ≤ +40% · buy during the next session near its average price (no buy in a buy queue) · stop 2×ATR ·
+  //  sell at the average price of the 7th session after entry (5th as the shorter option)
+  {
+    const ti = out.group.total_index || {}, ns = out.next_session || {};
+    const gate = ti.r20 > 0.10 && ti.r1 >= 0;
+    const why = [];
+    if (!gate) why.push(`بازار مساعد نیست: شاخص کل در ۲۰ جلسه ${R(100 * (ti.r20 || 0), 1)}٪ و امروز ${R(100 * (ti.r1 || 0), 1)}٪ (شرط: بیش از +۱۰٪ و امروز منفی نباشد)`);
+    if (ns.situation && ns.situation !== 'D') why.push('موقعیت غیرعادی (A/B/C)');
+    if (d.closed_at_upper_limit) why.push('صف خرید امروز (فردا اغلب قابل خرید نیست؛ در آزمون بازدهش هم کمتر بود)');
+    if (d.closed_at_lower_limit) why.push('صف فروش امروز');
+    if (d.rsi14 !== null && d.rsi14 > 80) why.push(`RSI ${d.rsi14} (بالای ۸۰؛ در آزمون زیان‌ده)`);
+    if (d.ret_20d !== null && d.ret_20d > 0.40) why.push(`بازده ۲۰ روزه ${R(100 * d.ret_20d, 1)}٪ (بیش از ۴۰٪؛ در آزمون زیان‌ده)`);
+    const ok = why.length === 0, weak = d.last_minus_close_pct < -1, atr = d.atr_pct || 0.035, stopPct = R(Math.max(0.03, 2 * atr), 4);
+    const px = k => Math.round(d.close * (1 + k) / 10) * 10;
+    out.swing = { version: '2.4', applies: SEC === '23', gate_open: gate, decision: !gate ? 'WAIT_MARKET' : ok ? 'BUY_SWING' : 'SKIP', priority: ok ? (weak ? 'A' : 'B') : null, reasons_skip: why,
+      plan: ok ? { entry: 'جلسهٔ بعد، در طول جلسه نزدیک میانگین روز (قیمت پایانی)، نه در بازگشایی؛ اگر صف خرید شد نخر', hold_sessions: 7, alt_hold_sessions: 5,
+        stop_pct: stopPct, stop_if_entry_at_today_close: px(-stopPct), stop_rule: 'اگر در هر جلسه کف روز به حد ضرر رسید بفروش؛ اگر زیر آن باز شد در بازگشایی؛ در صف فروش قفل، اولین جلسهٔ ممکن',
+        exit: 'قیمت پایانی جلسهٔ هفتم بعد از خرید (یا پنجم)', reference_prices_7d: { p25: px(-0.025), median: px(0.032), p75: px(0.094) },
+        position_pct_of_capital_at_1pct_risk: R(1 / stopPct, 1), note_targets: 'هدف ثابت (مثلاً ۳ برابر حد ضرر) در آزمون بازده را کم کرد؛ خروج زمانی بهتر بود. قیمت‌های مرجع هدف سفارش نیستند.' } : null,
+      backtest: { rule_7d: { test_1403_1405: { n: 259, mean_net_pct: 2.2, median_net_pct: 3.0, win_pct: 60 }, train_1397_1402: { n: 1514, mean_net_pct: 3.0, win_pct: 59 }, years_positive: '۹ از ۹ (۱۳۹۷ تا ۱۴۰۵)' },
+        rule_7d_weak_finish: { test_1403_1405: { n: 60, mean_net_pct: 4.7, win_pct: 73 }, train: { n: 285, mean_net_pct: 3.5 } },
+        rule_5d: { test_1403_1405: { n: 259, mean_net_pct: 1.1, win_pct: 59 }, train: { mean_net_pct: 1.4 } }, rule_3d: { test_mean_net_pct: 0.2, note: 'بعد از هزینه تقریباً صفر؛ پیشنهاد نمی‌شود' },
+        stop_hit_pct: 19, gross_7d_quantiles_pct: { p10: -8.0, p25: -2.5, median: 3.2, p75: 9.4, p90: 16.4 },
+        portfolio_3_slots_by_year_pct: { 1397: 50.5, 1398: 51.7, 1399: 8.6, 1400: 13.2, 1401: 16.0, 1402: 26.4, 1403: 16.9, 1404: 11.9, 1405: 13.1 },
+        group_index_by_year_pct: { 1397: 115, 1398: 105, 1399: 193, 1400: 16, 1401: 71, 1402: 16, 1403: 5, 1404: 90, 1405: 159 },
+        note: 'هزینهٔ ۱٫۲۵٪ کسر شده. سبد ۳ جایگاهی در همهٔ سال‌ها مثبت بود ولی در سال‌های رونق از نگهداری ساده عقب ماند (بیشتر وقت‌ها بیرون از بازار است).' },
+      note: SEC === '23' ? '' : 'این قاعده روی پالایشی‌ها آزموده شده؛ برای این گروه آزموده نشده.' };
+  }
   return out;
 }
 

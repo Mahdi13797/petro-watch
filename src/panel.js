@@ -114,6 +114,7 @@ const PetroWatch = (() => {
     if (t) {
       h += planHtml(t, b.codal);
       h += nextCard(t);
+      h += swingCard(t);
       h += sumCard(t, b.codal);
       h += sec('نمودار تکنیکال', PWChart.html(), true);
       h += sec('ابزارهای تکنیکال و اعتبار ۱۳ سالهٔ آن‌ها', techHtml(t), true);
@@ -158,6 +159,24 @@ const PetroWatch = (() => {
       <p class="small">هزینهٔ خرید و فروش حدود <b class="n">${nf(e.round_trip_cost_pct, 2)}٪</b> است. ${esc(ns.applies ? ns.note : '')}</p>`;
     if ((ns.confidence_flags || []).length) h += `<ul class="warns">${ns.confidence_flags.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
     h += `<p class="muted small">${esc(ns.walk_forward || '')}</p></div>`;
+    return h;
+  }
+  function swingCard(t) {
+    const w = t.swing; if (!w) return '';
+    const bt = w.backtest || {}, r7 = (bt.rule_7d || {}).test_1403_1405 || {}, rw = (bt.rule_7d_weak_finish || {}).test_1403_1405 || {}, r5 = (bt.rule_5d || {}).test_1403_1405 || {};
+    const DEC = { BUY_SWING: ['خرید برای نگهداری ۷ جلسه', 'ok'], WAIT_MARKET: ['صبر: بازار مساعد نیست', 'warn'], SKIP: ['این نماد الان نه', ''] };
+    const [lbl, cls] = DEC[w.decision] || ['—', ''];
+    let h = `<div class="card"><div><b>برنامهٔ چندروزه</b> <span class="muted small">نسخهٔ ۲٫۴ · قاعدهٔ آزموده روی ۱۱ پالایشی</span></div>
+      <div class="chips"><span class="badge ${cls}">${lbl}</span>${w.priority ? `<span class="badge">اولویت ${esc(w.priority)}${w.priority === 'A' ? ' (پایان ضعیف امروز)' : ''}</span>` : ''}</div>`;
+    if (w.note) h += `<div class="note warn">${esc(w.note)}</div>`;
+    if ((w.reasons_skip || []).length) h += `<ul class="warns">${w.reasons_skip.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    const p = w.plan;
+    if (p) h += `<div class="kv">${kv('ورود', esc(p.entry))}${kv('نگهداری', `${nf(p.hold_sessions)} جلسه <span class="muted small">(یا ${nf(p.alt_hold_sessions)})</span>`)}
+      ${kv('حد ضرر', `${num(p.stop_pct * 100, 1, '٪')} زیر قیمت خرید · اگر با پایانی امروز بخرید: <b>${num(p.stop_if_entry_at_today_close)}</b>`)}${kv('فروش', esc(p.exit))}
+      ${kv('قیمت‌های مرجع ۷ جلسه (چارک پایین / میانه / چارک بالا)', num(p.reference_prices_7d.p25) + ' / ' + num(p.reference_prices_7d.median) + ' / ' + num(p.reference_prices_7d.p75))}
+      ${kv('حجم با ریسک ۱٪ سرمایه', num(p.position_pct_of_capital_at_1pct_risk, 1, '٪') + ' سرمایه')}</div><p class="small">${esc(p.stop_rule)}. ${esc(p.note_targets)}</p>`;
+    h += `<p class="muted small">آزمون خارج از نمونه ۱۴۰۳ تا ۱۴۰۵ بعد از هزینه: ۷ جلسه میانگین ${sgn(r7.mean_net_pct, 1, '٪')}، برد ${num(r7.win_pct, 0, '٪')} (n = ${nf(r7.n)})؛
+      با پایان ضعیف ${sgn(rw.mean_net_pct, 1, '٪')}، برد ${num(rw.win_pct, 0, '٪')} (n = ${nf(rw.n)})؛ ۵ جلسه ${sgn(r5.mean_net_pct, 1, '٪')}؛ ۳ جلسه تقریباً صفر. ${esc(bt.note || '')}</p></div>`;
     return h;
   }
   function replayCard(b) {

@@ -259,6 +259,7 @@ try {
     check(tk && tk.ohlc_daily[tk.ohlc_daily.length - 1][0] === b.tsetmc.replay.session_used_dEven, 'no bar after the test date in the chart data');
     check(b && b.tsetmc.next_session && ['UP', 'DOWN', 'NONE'].includes(b.tsetmc.next_session.call) && b.tsetmc.next_session.prob, 'next_session block present');
     check(b && b.tsetmc.codal_recent && Array.isArray(b.tsetmc.codal_recent.letters), 'Codal list from tsetmc present');
+    check(b && b.tsetmc.swing && ['BUY_SWING', 'WAIT_MARKET', 'SKIP'].includes(b.tsetmc.swing.decision) && b.tsetmc.swing.backtest, 'swing plan block present (' + b?.tsetmc?.swing?.decision + ')');
     const txt = await shadow(page, '[data-el="result"]').innerText();
     check(/آزمون گذشته/.test(txt) && /جلسهٔ بعد/.test(txt), 'replay and next-session cards rendered');
     check(b && !('outcome' in b.tsetmc) && !JSON.stringify(b.tsetmc).includes('next_close_pct'), 'the snapshot given to Claude carries no outcome (blind test)');

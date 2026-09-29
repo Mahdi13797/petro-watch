@@ -44,7 +44,7 @@ const tehranTime = iso_ => new Intl.DateTimeFormat('fa-IR-u-ca-persian', { timeZ
 const TR = { up: ['صعودی', 'ok'], down: ['نزولی', 'bad'], mixed: ['مختلط', ''], unknown_short_history: ['سابقهٔ کم', ''], all_up: ['هر سه صعودی', 'ok'], all_down: ['هر سه نزولی', 'bad'], incomplete: ['ناقص', ''] };
 const chip = v => { const [t, c] = TR[v] || [v || '—', '']; return `<span class="pill ${c}">${esc(t)}</span>`; };
 const REG = { hot: 'داغ', mid: 'عادی', cold: 'سرد' };
-const exitDate = s => { let d = s; for (let k = 0; k < 5; k++) d = nextSession(d); return d; };
+const exitDate = (s, n = 5) => { let d = s; for (let k = 0; k < n; k++) d = nextSession(d); return d; };
 
 // OHLC packed as deltas by src/report.js → plain [dEven, open, high, low, close, volume] rows
 const unpack = o => { if (!o || Array.isArray(o)) return o || []; const out = []; o.v.forEach((r, i) => { const p = out[i - 1];
@@ -62,6 +62,16 @@ function signalLine() {
   if (!buys.length && !sells.length) return '<p class="sig none"><b>سیگنال مدل:</b> سیگنال خرید یا فروش ندارد.</p>';
   return `<div class="sig"><b>سیگنال مدل</b><ul>${buys.map(r => `<li><span class="tag buy">خرید</span> <b>${esc(r.sym)}</b>: جلسهٔ بعد از ۱۱:۰۰ تا پایان جلسه، تا قیمت ${num(r.plan.upper)}؛ در بازگشایی و در صف خرید نخرید. حد ضرر ${num(r.plan.signal.stop)} · هدف ${num(r.plan.signal.target)} · ${num(r.plan.signal.size, 0, '٪')} سرمایه${r.size_scaled ? ' (کم شد تا جمع از ۱۰۰٪ نگذرد)' : ''} · خروج حداکثر تا پایان ${esc(jLong(exitDate(session)))}${cod(r)}</li>`).join('')}
     ${sells.map(r => `<li><span class="tag sell">فروش</span> <b>${esc(r.sym)}</b>: اگر دارید، جلسهٔ بعد بعد از ۱۰:۳۰ بفروشید؛ در صف فروش نفروشید${cod(r)}</li>`).join('')}</ul></div>`;
+}
+
+// multi-day swing plan (v2.4): the tested 7-session rule, at most 3 positions, weak finish (A) first
+function swingLine() {
+  const sw = rows.filter(r => r.swing && r.swing.applies);
+  if (!sw.length) return '';
+  if (!sw.some(r => r.swing.gate_open)) return `<p class="sig none"><b>برنامهٔ ۷ جلسه:</b> بازار مساعد نیست (${esc((sw[0].swing.reasons || [])[0] || '')}). خرید چندروزهٔ جدید نه.</p>`;
+  const buys = sw.filter(r => r.swing.decision === 'BUY_SWING').sort((a, b) => (a.swing.priority || 'Z').localeCompare(b.swing.priority || 'Z') || (a.rank || 99) - (b.rank || 99)).slice(0, 3);
+  if (!buys.length) return '<p class="sig none"><b>برنامهٔ ۷ جلسه:</b> بازار مساعد است ولی هیچ نمادی شرط‌ها را ندارد (صف، RSI بالای ۸۰ یا رشد ۲۰ روزهٔ بیش از ۴۰٪).</p>';
+  return `<div class="sig"><b>برنامهٔ ۷ جلسه</b> <span class="muted">(قاعدهٔ آزموده: ۱۴۰۳ تا ۱۴۰۵ بعد از هزینه میانگین +۲٫۲٪، برد ۶۰٪؛ با پایان ضعیف +۴٫۷٪)</span><ul>${buys.map(r => `<li><span class="tag buy">خرید ${esc(r.swing.priority)}</span> <b>${esc(r.sym)}</b>: ${esc(jLong(session))} در طول جلسه نزدیک میانگین روز، نه در بازگشایی؛ در صف خرید نخرید. حد ضرر ${num(r.swing.stop_pct * 100, 1, '٪')} زیر قیمت خرید (با پایانی امروز ${num(r.swing.stop)}) · ${num(r.swing.size, 1, '٪')} سرمایه با ریسک ۱٪ · فروش: پایانی ${esc(jLong(exitDate(session, 7)))} · قیمت مرجع ۷ جلسه ${num(r.swing.refs.p25)} / ${num(r.swing.refs.median)} / ${num(r.swing.refs.p75)}</li>`).join('')}</ul></div>`;
 }
 
 function table() {
@@ -225,6 +235,7 @@ const body = `<title>برنامهٔ روزانهٔ دیدبان</title>
     <h1>برنامهٔ جلسهٔ ${esc(jLong(session))}</h1>
     <p class="meta">${P.last_trading_date ? `دادهٔ جلسهٔ ${esc(jShort(P.last_trading_date))}` : ''}${gen ? ` · گرفته‌شده ${esc(gen)}` : ''} · طبق قاعده‌های مدل دیدبان · ریسک ۱٪ سرمایه در هر معامله</p></header>
   ${P.no_session_today ? '<p class="sig none"><b>امروز جلسهٔ معاملاتی نبود؛</b> اعداد مربوط به آخرین جلسه است.</p>' : ''}
+  ${swingLine()}
   ${signalLine()}
   <section class="panel"><h3>جدول اجرایی</h3>${table()}</section>
   <section class="panel"><h3>دو نماد مهم فردا</h3>${why()}</section>
