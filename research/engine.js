@@ -40,8 +40,13 @@ function pwEngine(P, opt = {}) {
   const upG = allD.map(d => { const v = ext.get(d)[0]; return v >= 0.02 && v <= 0.10 ? grid(v) : null; });
   const dnG = allD.map(d => { const v = -ext.get(d)[1]; return v >= 0.02 && v <= 0.10 ? grid(v) : null; });
   const modeWin = (arr, i, w) => { const c = new Map(); for (let k = Math.max(0, i - w); k <= Math.min(arr.length - 1, i + w); k++) if (arr[k] !== null) c.set(arr[k], (c.get(arr[k]) || 0) + 1); let best = null, bn = 0; c.forEach((n, v) => { if (n > bn || (n === bn && v > best)) { best = v; bn = n; } }); return best; };
+  // actual thresholds when available (opt.thresholds[date] = { y, recs: [[hEven, max, min]...] } of one reference stock,
+  // from MarketData/GetStaticThreshold); the day's LAST record is the range in force at the close
+  const TH = opt.thresholds || {};
+  const thPct = d => { const x = TH[d]; if (!x || !x.recs || !x.recs.length || !(x.y > 0)) return null; const q = x.recs[x.recs.length - 1];
+    const u = Math.round((q[1] / x.y - 1) * 200) / 200, dn = Math.round((1 - q[2] / x.y) * 200) / 200; return u >= 0.005 && u <= 0.1 && dn >= 0.005 && dn <= 0.1 ? [u, dn] : null; };
   const LIM = new Map(); const limits = [];
-  allD.forEach((d, i) => { const u = modeWin(upG, i, 60) || 0.05, dn = modeWin(dnG, i, 60) || 0.05; LIM.set(d, [u, dn]); if (!limits.length || limits[limits.length - 1][1] !== u || limits[limits.length - 1][2] !== dn) limits.push([d, u, dn]); });
+  allD.forEach((d, i) => { const th = thPct(d); const u = th ? th[0] : (modeWin(upG, i, 60) || 0.05), dn = th ? th[1] : (modeWin(dnG, i, 60) || 0.05); LIM.set(d, [u, dn]); if (!limits.length || limits[limits.length - 1][1] !== u || limits[limits.length - 1][2] !== dn) limits.push([d, u, dn]); });
 
   // ---------- v2.3 calibration table (group 44, 1392-1405): [n, p1, p3, p5, p10, med5, gain5, loss5]
   const CAL = { hot: { '<=-4': [30, .10, .23, .20, .27, -3.3, 3.4, -5.6], '-3..-2': [2575, .25, .52, .55, .58, 0.8, 6.7, -4.8], '-1..+1': [9398, .51, .54, .57, .61, 1.0, 6.4, -4.2], '+2..+3': [2332, .76, .56, .57, .60, 1.1, 7.0, -4.5], '>=+4': [141, .87, .72, .74, .78, 4.4, 10.1, -3.5], ALL: [14476, .50, .54, .57, .61, 1.0, 6.6, -4.4] },
