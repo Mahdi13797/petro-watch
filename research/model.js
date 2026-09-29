@@ -27,11 +27,20 @@ const PM = (() => {
     ['oversold20', r => r.r20b < -0.15 ? 1 : 0], ['drop_noq', r => r.chg < -2 && !r.dnQ ? 1 : 0], ['below_sma50', r => r.sma50 < -0.10 ? 1 : 0],
     ['vol_low', r => r.volr !== null && r.volr < 0.5 ? 1 : 0], ['vol_high', r => r.volr > 2 ? 1 : 0],
     ['wide_range', r => r.lu >= 0.06 ? 1 : 0], ['hot', r => r.regime === 'hot' ? 1 : 0], ['cold', r => r.regime === 'cold' ? 1 : 0]];
-  const X = r => FEATS.map(([, f]) => f(r));
+  // v2.4 candidate rows for the refiners (the stable ones from the residual study + two Codal rows)
+  const FEATS24 = [
+    ['strong', r => r.pts.strong ? 1 : 0], ['weak', r => r.pts.weak ? 1 : 0], ['buyq', r => r.upQ ? 1 : 0], ['sellq', r => r.dnQ ? 1 : 0], ['smart', r => r.pts.smart ? 1 : 0],
+    ['buyq_lowvol', r => r.upQ && r.volr !== null && r.volr < 0.7 ? 1 : 0], ['buyq_run2', r => r.upQ && r.upRun >= 2 ? 1 : 0], ['sellq_lowvol', r => r.dnQ && r.volr !== null && r.volr < 0.7 ? 1 : 0], ['sellq_run2', r => r.dnQ && r.dnRun >= 2 ? 1 : 0],
+    ['rsi30', r => r.pts.rsi30 ? 1 : 0], ['boll', r => r.pts.boll ? 1 : 0], ['bp05', r => r.pts.bp05 ? 1 : 0],
+    ['grp_buyq50', r => r.gQup >= 0.5 ? 1 : 0], ['grp_sellq50', r => r.gQdn >= 0.5 ? 1 : 0], ['total_dn1', r => r.T1 < -0.01 ? 1 : 0],
+    ['drop_noq', r => r.chg < -2 && !r.dnQ ? 1 : 0], ['vol_low', r => r.volr !== null && r.volr < 0.5 ? 1 : 0], ['wide_range', r => r.lu >= 0.06 ? 1 : 0],
+    ['capinc_night', r => (r.cdNight || []).some(t => t === 'CAPINC_PROPOSAL' || t === 'CAPINC_STEP' || t === 'EGM') ? 1 : 0], ['interim_today', r => (r.cdToday || []).includes('INTERIM_FS') ? 1 : 0]];
+  let FS = FEATS; const useFeats = which => { FS = which === 24 ? FEATS24 : FEATS; return FS.length; };
+  const X = r => FS.map(([, f]) => f(r));
 
   // logistic regression (full-batch Adam, L2)
   function logit(rows, { iters = 400, l2 = 1e-3, lr = 0.05 } = {}) {
-    const k = FEATS.length + 1, w = new Array(k).fill(0), m = new Array(k).fill(0), v = new Array(k).fill(0);
+    const k = FS.length + 1, w = new Array(k).fill(0), m = new Array(k).fill(0), v = new Array(k).fill(0);
     const xs = rows.map(r => [1, ...X(r)]), ys = rows.map(up), N = rows.length;
     for (let it = 1; it <= iters; it++) {
       const g = new Array(k).fill(0);
@@ -49,8 +58,8 @@ const PM = (() => {
     return { T, predict: r => { const e = T.get(key(r)) || [0, 0]; return (e[0] + m * prior(r)) / (e[1] + m); } };
   }
   // v2.4 integer score from logistic weights (1 point ≈ 0.35 logit), rows whose weight rounds to 0 are dropped
-  function points(w, unit = 0.35) { const P = {}; FEATS.forEach(([name], j) => { const p = Math.round(w[j + 1] / unit); if (p) P[name] = p; }); return P; }
-  const scoreOf = (P, r) => FEATS.reduce((s, [name, f]) => s + (P[name] ? P[name] * f(r) : 0), 0);
+  function points(w, unit = 0.35) { const P = {}; FS.forEach(([name], j) => { const p = Math.round(w[j + 1] / unit); if (p) P[name] = p; }); return P; }
+  const scoreOf = (P, r) => FS.reduce((s, [name, f]) => s + (P[name] ? P[name] * f(r) : 0), 0);
   const sband = s => s <= -6 ? '<=-6' : s <= -4 ? '-5..-4' : s <= -2 ? '-3..-2' : s <= 1 ? '-1..+1' : s <= 3 ? '+2..+3' : s <= 5 ? '+4..+5' : '>=+6';
 
   function auc(ps, ys) { const a = ps.map((p, i) => [p, ys[i]]).sort((x, y) => x[0] - y[0]); let rk = 0, sumPos = 0, nP = 0, nN = 0;
@@ -107,6 +116,6 @@ const PM = (() => {
     return [...st(s1), ...st(s2), ...st(selS)];
   }
   const SHEAD = ['S1 n', 'S1 net%', 'S1 win%', 'S2 n', 'S2 net%', 'S2 win%', 'H1 n', 'H1 saved%', 'H1 right%'];
-  return { setTarget, strat, SHEAD, COST, FEATS, X, logit, table, points, scoreOf, sband, auc, metrics, walk, HEAD, mline, tsv, f2, mean, jy };
+  return { useFeats, FEATS24, get FS() { return FS; }, setTarget, strat, SHEAD, COST, FEATS, X, logit, table, points, scoreOf, sband, auc, metrics, walk, HEAD, mline, tsv, f2, mean, jy };
 })();
 if (typeof window !== 'undefined') window.PM = PM;
