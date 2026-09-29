@@ -113,9 +113,11 @@ const PetroWatch = (() => {
     if (t) {
       h += planHtml(t, b.codal);
       h += sumCard(t, b.codal);
+      h += sec('نمودار تکنیکال', PWChart.html(), true);
+      h += sec('ابزارهای تکنیکال و اعتبار ۱۳ سالهٔ آن‌ها', techHtml(t), true);
       if (t.ipo) h += sec('عرضهٔ اولیه (IPO)', ipoHtml(t.ipo), true);
       h += sec('روند چندافقی', trendHtml(t.trend, t), true);
-      h += sec('نمودار و سطوح کلیدی', levelsHtml(t), true);
+      h += sec('سطوح کلیدی', levelsHtml(t), false);
       h += sec('جریان پول حقیقی/حقوقی', flowsHtml(t.flows), false);
       h += sec('اندیکاتورهای روزانه', dailyHtml(t.daily), false);
       if (t.intraday_today) h += sec('درون‌روز امروز', intradayHtml(t.intraday_today), false);
@@ -258,6 +260,31 @@ const PetroWatch = (() => {
       <p class="muted small">در آزمون ۱۳ ساله سطوح جهت را پیش‌بینی نکردند؛ برای ورود، حد ضرر و هدف به کار می‌روند.</p>`;
   }
 
+  const PAT_ST = { forming: 'در حال شکل‌گیری', broken_today: 'امروز شکسته شد', broken_up_today: 'امروز رو به بالا شکسته شد', broken_down_today: 'امروز رو به پایین شکسته شد' };
+  function techHtml(t) {
+    const k = t.technical, d = t.daily || {};
+    if (!k) return '<p class="muted">این خروجی بخش technical ندارد (نسخهٔ قدیمی اسکریپت)؛ دوباره داده بگیرید.</p>';
+    const f = k.fibonacci, pv = k.pivots || {}, ic = k.ichimoku, stc = k.stochastic, bb = k.bollinger, mc = k.macd;
+    const iso = (l, v, d = 0) => `<span class="n">${l} ${nf(v, d)}</span>`;   // Latin label + number kept together inside RTL text
+    const pvTxt = o => o ? ['R2', 'R1', 'P', 'S1', 'S2'].map(x => iso(x, o[x])).join(' · ') : '—';
+    const rows = [
+      ['فیبوناچی', f ? `نوسان ${f.direction === 'up' ? 'صعودی' : 'نزولی'} ${num(f.swing_pct, 1, '٪')} از ${num(f.swing_from[1])} (${jd(f.swing_from[0])}) تا ${num(f.swing_to[1])} (${jd(f.swing_to[0])})${f.valid_swing ? '' : ' <span class="muted">(هنوز معتبر نیست)</span>'}؛ اصلاح فعلی ${P(f.retracement_now, 1)}؛ نزدیک‌ترین سطح ${f.nearest_level ? `${num(f.nearest_level[0] * 100, 1, '٪')} = ${num(f.nearest_level[1])} (${sgn(f.nearest_level[2], 1, '٪')})` : '—'}<br><span class="small muted">اصلاحی: ${f.retracement_levels.slice(1, -1).map(([r, x]) => `${num(r * 100, 1, '٪')} ${num(x)}`).join(' · ')} — گسترش: ${f.extension_levels.map(([r, x]) => `${num(r * 100, 1, '٪')} ${num(x)}`).join(' · ')}</span>` : '—'],
+      ['پیوت جلسهٔ بعد', pvTxt(pv.next_session_daily)], ['پیوت هفتگی', pvTxt(pv.weekly_from_last_completed_week)],
+      ['ایچیموکو', ic ? `قیمت ${ic.price_vs_cloud === 'above' ? 'بالای' : ic.price_vs_cloud === 'below' ? 'زیر' : 'داخل'} ابر (${num(ic.cloud_bottom)} تا ${num(ic.cloud_top)}) · تنکان ${num(ic.tenkan)} · کیجون ${num(ic.kijun)} · ابر ۲۶ روز آینده ${ic.future_cloud_26 === 'bullish' ? 'صعودی' : 'نزولی'}${ic.tk_cross_today ? ` · تقاطع امروز ${ic.tk_cross_today === 'up' ? 'رو به بالا' : 'رو به پایین'}` : ''}` : '<span class="muted">سابقهٔ کافی نیست</span>'],
+      ['Stochastic ۱۴،۳', stc ? `${iso('K', stc.k, 1)} · ${iso('D', stc.d, 1)}${stc.cross ? ` · ${stc.cross === 'up_below_20' ? 'تقاطع رو به بالا زیر ۲۰' : 'تقاطع رو به پایین بالای ۸۰'}` : ''}` : '—'],
+      ['Bollinger ۲۰،۲', bb ? `${num(bb.lower)} تا ${num(bb.upper)} · میانه ${num(bb.middle)} · پهنا ${num(bb.width_pct, 1, '٪')} · ${iso('%b', d.bollinger_pctb, 2)}` : '—'],
+      ['MACD ۱۲،۲۶،۹', mc ? `${num(mc.macd, 1)} / سیگنال ${num(mc.signal, 1)} · هیستوگرام ${sgn(mc.hist, 1)}` : '—'],
+      ['RSI ۱۴ و واگرایی', `${num(d.rsi14, 1)}${(k.rsi_divergence || []).length ? ' · ' + k.rsi_divergence.map(x => `واگرایی ${x.type === 'bullish' ? 'مثبت' : 'منفی'} (${jd(x.swings[0][0])} و ${jd(x.swings[1][0])})`).join('، ') : ' · واگرایی نیست'}`],
+      ['کندل امروز', (k.candles_today || []).length ? esc(k.candles_today.join('، ')) : '<span class="muted">الگوی شناخته‌شده‌ای نیست</span>'],
+      ['الگوهای کلاسیک', (k.chart_patterns || []).length ? k.chart_patterns.map(x => `<b>${esc(x.fa)}</b> (${PAT_ST[x.status] || esc(x.status)})${isNum(x.neckline) ? ` · خط گردن ${num(x.neckline)} · هدف ${num(x.measured_target)}` : ''}${isNum(x.breakout_up_above) ? ` · شکست بالای ${num(x.breakout_up_above)} (هدف ${num(x.measured_target_up)}) یا زیر ${num(x.breakdown_below)} (هدف ${num(x.measured_target_down)})` : ''}`).join('<br>') : '<span class="muted">الگوی فعالی نیست</span>']];
+    const sig = k.signals_today || [];
+    return `<table><tbody>${rows.map(([a, b]) => `<tr><td style="white-space:nowrap">${a}</td><td>${b}</td></tr>`).join('')}</tbody></table>
+      <h4>سیگنال‌های کلاسیک امروز و اعتبار آن‌ها در ۱۳ سال</h4>
+      ${sig.length ? `<table><thead><tr><th>سیگنال</th><th>n</th><th>لبهٔ ۵ روزه</th><th>لبهٔ ۲۰ روزه</th><th>هم‌جهت در دوره‌ها</th></tr></thead><tbody>
+      ${sig.map(x => `<tr><td>${esc(x.fa)}</td><td>${num(x.n)}</td><td>${sgn(x.edge_5d_pp, 1, ' واحد')}</td><td>${sgn(x.edge_20d_pp, 1, ' واحد')}</td><td>${num(x.eras_same_sign_of_5)} از ۵</td></tr>`).join('')}</tbody></table>` : '<p class="muted small">امروز هیچ سیگنال کلاسیکی فعال نیست.</p>'}
+      <p class="muted small">لبه = فاصلهٔ احتمال رشد از میانگین گروه در همان روز (۱۳۹۲ تا ۱۴۰۵، گروه ۴۴). هیچ ابزار کلاسیکی، فیبوناچی هم، لبهٔ پایدار بیش از ±۳ واحد نداشت؛ سطوح فیبوناچی از سطوح دلخواه (۳۰، ۴۵، ۵۶، ۷۰٪) بهتر عمل نکردند. این ابزارها برای رسم، حد ضرر و هدف است؛ جهت از امتیاز v2 و جریان پول می‌آید.</p>`;
+  }
+
   function flowsHtml(f) {
     if (!f) return '<p class="muted">دادهٔ حقیقی/حقوقی نیامد.</p>';
     const mt = x => isNum(x) ? num(x / 1e6, 1, ' میلیون ت') : '—';
@@ -376,7 +403,9 @@ const PetroWatch = (() => {
     const extra = [m.horizon && `افق: ${m.horizon} روز`, m.position && `وضعیت: ${m.position}`, m.risk && `ریسک هر معامله: ${m.risk}٪ سرمایه`].filter(Boolean);
     if (extra.length) L.push(extra.join(' · '));
     L.push('', `داده‌ها با پنل «دیدبان پتروشیمی» (نسخهٔ ${PW_VERSION}) در ${tehranTime(b.collected_at)} به وقت تهران جمع شد. برای گام ۱ از همین خروجی‌ها استفاده کن؛ فقط بخشی را که خطا دارد یا نیامده دوباره بگیر.`);
-    L.push('', '### petroSnapshot', b.tsetmc ? '```json\n' + JSON.stringify(b.tsetmc) + '\n```' : '(گرفته نشد)');
+    // OHLC for the chart: the last 150 daily and 52 weekly bars are enough for Claude to draw it
+    const ts = b.tsetmc && b.tsetmc.technical ? { ...b.tsetmc, technical: { ...b.tsetmc.technical, ohlc_daily: (b.tsetmc.technical.ohlc_daily || []).slice(-150), ohlc_weekly: (b.tsetmc.technical.ohlc_weekly || []).slice(-52) } } : b.tsetmc;
+    L.push('', '### petroSnapshot', ts ? '```json\n' + JSON.stringify(ts) + '\n```' : '(گرفته نشد)');
     L.push('', `### codalSnapshot (${b.codal_days || 120} روز)`, b.codal ? '```json\n' + JSON.stringify(b.codal) + '\n```' : '(گرفته نشد)');
     (b.letters || []).forEach(x => L.push('', `### codalLetterText — ${fixFa(x.title || x.url)}`, '```json\n' + JSON.stringify(x) + '\n```'));
     const s = L.join('\n');
@@ -459,7 +488,9 @@ const PetroWatch = (() => {
       <button class="btn" data-act="dl-json">دانلود JSON</button><button class="btn" data-act="merge-toggle">ادغام</button></div>
       <div class="merge" data-el="merge" hidden><textarea class="ta" data-el="merge-ta" placeholder="خروجی JSON پنل در تب دیگر (tsetmc یا کدال) را اینجا بچسبانید"></textarea>
       <div class="row" style="margin-top:6px"><button class="btn" data-act="merge">ادغام با نتیجهٔ فعلی</button></div></div>${dash(b)}`;
+    PWChart.mount(box, b, { plan: planSafe(b), store, toast });
   }
+  function planSafe(b) { try { return b && b.tsetmc && !b.tsetmc.error && b.tsetmc.daily ? planOf(b.tsetmc, b.codal) : null; } catch (e) { return null; } }
 
   function renderSteps() {
     const el = $('[data-el="steps"]'); if (!el) return;
@@ -664,6 +695,7 @@ const PetroWatch = (() => {
     let b = data;
     if (b && b.tool !== 'petro-watch') { b = { tool: 'petro-watch', symbol: (b.symbol || ''), collected_at: b.generated_at || new Date().toISOString(), tsetmc: null, codal: null, letters: [] }; mergeInto(b, JSON.stringify(data)); }
     root.innerHTML = `<style>${PW_CSS}</style><div class="pw inline${el.clientWidth > 700 ? ' wide' : ''}" dir="rtl" lang="fa"><div class="body" style="padding:0">${dash(b, { readonly: true })}</div></div>`;
+    PWChart.mount(root.querySelector('.body'), b, { plan: planSafe(b), store, toast: () => {} });
     return b;
   }
 

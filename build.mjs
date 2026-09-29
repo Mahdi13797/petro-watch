@@ -14,9 +14,10 @@ const installBase = cfg.public ? raw : '';
 
 const collector = read('src/petro_collector.js');
 const bridge = read('src/fetch-bridge.js');
+const chart = read('src/chart.js');
 const panel = read('src/panel.js');
 const css = read('src/panel.css');
-const prompt = read('prompt/Petro_Agent_Prompt_FA_v2_2.md');
+const prompt = read('prompt/Petro_Agent_Prompt_FA_v2_3.md');
 
 const body = `(function () {
 const PW_VERSION = ${JSON.stringify(version)};
@@ -39,6 +40,7 @@ ${collector}
 return { petroSnapshot, petroEvaluate, codalSnapshot, codalLetterText };
 })(PW_NET.fetch);
 
+${chart}
 ${panel}
 })();
 `;

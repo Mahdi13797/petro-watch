@@ -94,6 +94,29 @@ try {
     await shadow(page, '[data-act="copy-claude"]').click();
     const clip = await page.evaluate(() => window.__clip || '');
     check(clip.startsWith('نماد: ' + MOCK.SYM) && clip.includes('### petroSnapshot') && clip.includes('### codalLetterText'), 'copy for Claude produces the bundle text');
+    const tk = b && b.tsetmc && b.tsetmc.technical;
+    check(tk && tk.ohlc_daily.length >= 300 && tk.ohlc_weekly.length >= 60 && tk.fibonacci && tk.pivots && tk.ichimoku && Array.isArray(tk.signals_today), 'technical block: OHLC, fibonacci, pivots, ichimoku, signals');
+    const clipJ = JSON.parse(clip.split('### petroSnapshot\n```json\n')[1].split('\n```')[0]);
+    check(clipJ.technical && clipJ.technical.ohlc_daily.length === 150 && clipJ.technical.ohlc_weekly.length === 52, 'Claude text carries a trimmed OHLC (150 daily, 52 weekly)');
+    const nRect = await shadow(page, '[data-tchart] svg rect').count();
+    check(nRect > 150, `technical chart drawn (${nRect} rects)`);
+    check(/فیبوناچی/.test(await shadow(page, '[data-tchart]').innerText()) && /سیگنال‌های کلاسیک امروز/.test(txt), 'chart layers and tools table rendered');
+    await shadow(page, '[data-tchart] [data-ch="tf"][data-v="W"]').click();
+    check(await shadow(page, '[data-tchart] [data-ch="tf"][data-v="W"]').getAttribute('aria-pressed') === 'true' && /هفتگی/.test(await shadow(page, '[data-tchart] svg').innerHTML()), 'weekly timeframe redraws');
+    await shadow(page, '[data-tchart] [data-ch="tf"][data-v="D"]').click();
+    await shadow(page, '[data-tchart] [data-ch="layer"][data-v="ichi"]').click();
+    check(await shadow(page, '[data-tchart] svg polygon').count() > 20, 'Ichimoku cloud toggles on');
+    await shadow(page, '[data-tchart] [data-ch="layer"][data-v="ichi"]').click();
+    const sb = await shadow(page, '[data-tchart] .tc-svg').boundingBox();
+    await page.mouse.move(sb.x + sb.width * 0.5, sb.y + sb.height * 0.3);
+    await page.waitForTimeout(150);
+    check(/پایانی/.test(await shadow(page, '[data-tchart] .tc-tip').innerText()), 'hover tooltip shows the candle');
+    const dl = page.waitForEvent('download', { timeout: 10000 }).catch(() => null);
+    await shadow(page, '[data-tchart] [data-ch="png"]').click();
+    // headless Chromium reports non-ASCII download names as "download", so check the bytes instead of the name
+    const d = await dl, fp = d && await d.path(), head = fp ? fs.readFileSync(fp).subarray(0, 8).toString('hex') : '';
+    check(head === '89504e470d0a1a0a', 'chart PNG download is a real PNG (' + (fp ? fs.statSync(fp).size + ' bytes' : 'no file') + ')');
+    await shadow(page, '[data-tchart]').screenshot({ path: OUT + '1d-chart.png' });
     await page.screenshot({ path: OUT + '1-tsetmc-userscript.png' });
     await shadow(page, '[data-act="wide"]').click();
     await shadow(page, 'details.sec').evaluateAll(ds => ds.forEach(d => { d.open = true; }));
@@ -138,6 +161,7 @@ try {
     const b = await lastResult(page);
     check(await shadow(page, 'input[name="c"]').isDisabled(), 'codal disabled on tsetmc without an extension');
     check(b && b.tsetmc && b.tsetmc.rubric && !b.codal, 'tsetmc-only run in console mode');
+    check(await shadow(page, '[data-tchart] svg').count() === 1, 'chart drawn at mobile width');
     await page.screenshot({ path: OUT + '3-tsetmc-console-mobile.png' });
     await shadow(page, '[data-tab="book"]').click();
     let k = 14; while ([4, 5].includes(new Date(MOCK.today.getTime() - k * 864e5).getUTCDay())) k++;
@@ -168,6 +192,7 @@ try {
     await page.waitForTimeout(500);
     const vt = await page.locator('#view .sum').innerText().catch(() => '');
     check(/امتیاز بدون کدال/.test(vt), 'viewer renders sample.json');
+    check(await page.locator('#view [data-tchart] svg rect').count() > 150, 'viewer draws the technical chart');
     await page.screenshot({ path: OUT + '4b-viewer.png', fullPage: true });
     check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
     await ctx.close();
