@@ -85,7 +85,7 @@ function why() {
   if (!top.length) return '<p class="muted">هیچ نماد قابل معامله‌ای برای رتبه‌بندی نبود.</p>';
   return `<ol class="why">${top.map((x, i) => { const r = rows.find(y => y.sym === x.sym) || {}, p = r.plan || {};
     const reason = r.signal_blocked ? `${esc(r.signal_blocked)}؛ مدل برای این وضعیت برآورد ندارد و فقط ماشهٔ شکست سقف مانده` : p.signal && p.signal.side === 'buy' ? 'سیگنال خرید مدل دارد' : p.trigger && p.trigger.reachableTomorrow ? `ماشهٔ خرید فردا دست‌یافتنی است (${num(p.trigger.level)}، ${sgn(r.dist_to_trigger_pct, 1, '٪')} نسبت به پایانی)` : 'ماشهٔ خرید فردا دست‌یافتنی نیست؛ بعدی در رتبه‌بندی';
-    return `<li><a href="#s-${i + 1}"><b>${esc(x.sym)}</b></a> — ${reason} · بازدهٔ مورد انتظار ۵ روز طبق جدول مدل ${sgn(r.ev5, 1, '٪')} (احتمال رشد ${num(isNum(r.p_up_5d) ? r.p_up_5d * 100 : null, 0, '٪')}) · امتیاز ${sgn(r.score, 0)} · رژیم گروه ${esc(REG[r.regime] || '—')}</li>`; }).join('')}</ol>
+    return `<li><a href="#s-${i + 1}"><b>${esc(x.sym)}</b></a> — ${reason} · بازدهٔ مورد انتظار ۵ روز طبق جدول مدل ${sgn(r.ev5, 1, '٪')} (احتمال رشد ${num(isNum(r.p_up_5d) ? r.p_up_5d * 100 : null, 0, '٪')}) · امتیاز ${sgn(r.score_with_codal ?? r.score, 0)}${r.score_with_codal !== undefined && r.score_with_codal !== r.score ? ' (با کدال)' : ''} · رژیم گروه ${esc(REG[r.regime] || '—')}</li>`; }).join('')}</ol>
     <p class="note">ترتیب: اول سیگنال خرید مدل، بعد ماشه‌ای که فردا دست‌یافتنی است، بعد بازدهٔ مورد انتظار ۵ روزه (احتمال × متوسط سود + (۱ − احتمال) × متوسط زیان در جدول کالیبراسیون)، بعد نزدیکی به ماشه. این عدد میانگین تاریخی موقعیت‌های مشابه است، نه پیش‌بینی سود.</p>`;
 }
 

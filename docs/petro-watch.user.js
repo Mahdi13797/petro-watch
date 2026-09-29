@@ -1024,6 +1024,12 @@ function pwMakeReport(PC, planOf, net) {
   const nextSession = dInt => { const s = String(dInt); const d = new Date(Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8))); do { d.setUTCDate(d.getUTCDate() + 1); } while ([4, 5].includes(d.getUTCDay())); return +d.toISOString().slice(0, 10).replace(/-/g, ''); };
   // OHLC as deltas (date and prices vs the previous bar's close, volume in thousands): about 40% smaller after gzip
   const packOHLC = a => ({ k: 'delta1', v: a.map((r, i) => { const p = a[i - 1]; return p ? [r[0] - p[0], r[1] - p[4], r[2] - p[4], r[3] - p[4], r[4] - p[4], Math.round(r[5] / 1000)] : [r[0], r[1], r[2], r[3], r[4], Math.round(r[5] / 1000)]; }) });
+  // P(up in 5 days), average gain, average loss by regime × score band (the prompt's calibration table, 1392-1405)
+  const CAL5 = { hot: [[0.20, 3.4, -5.6], [0.55, 6.7, -4.8], [0.57, 6.4, -4.2], [0.57, 7.0, -4.5], [0.74, 10.1, -3.5]],
+    mid: [[0.31, 3.3, -2.3], [0.41, 5.6, -3.0], [0.48, 5.8, -3.1], [0.54, 9.9, -3.3], [0.58, 5.2, -3.1]],
+    cold: [[0.38, 4.1, -2.5], [0.43, 4.6, -3.4], [0.47, 5.2, -4.0], [0.50, 5.9, -4.4], [0.57, 7.2, -4.9]] };
+  const bandIdx = sc => sc <= -4 ? 0 : sc <= -2 ? 1 : sc <= 1 ? 2 : sc <= 3 ? 3 : 4;
+  const evFor = (regime, sc) => { const c = CAL5[regime] && CAL5[regime][bandIdx(sc)]; return c ? { p5: c[0], ev5: R(c[0] * c[1] + (1 - c[0]) * c[2], 2) } : { p5: null, ev5: null }; };
   const cal5 = r => { const c = (r && r.calibration_for_this_band) || {}; return (typeof c.p_up_5d === 'number' && typeof c.avg_gain_5d_pct === 'number' && typeof c.avg_loss_5d_pct === 'number') ? c.p_up_5d * c.avg_gain_5d_pct + (1 - c.p_up_5d) * c.avg_loss_5d_pct : null; };
 
   async function start(symbols, opts = {}) {
@@ -1060,7 +1066,8 @@ function pwMakeReport(PC, planOf, net) {
           const c = await lightCodal(x.sym);
           if (!c.ok) { x.codal = { checked: false, why: c.why }; continue; }
           const cp = codalPoints(c.letters); x.codal = { checked: true, pts: cp.pts, hits: cp.hits, review: cp.review };
-          if (cp.pts) { const t = snaps[x.sym]; x.plan = planOf({ ...t, rubric: { ...t.rubric, subtotal_without_codal: x.score + cp.pts } }, null); x.score_with_codal = x.score + cp.pts; } }
+          if (cp.pts) { const t = snaps[x.sym]; x.plan = planOf({ ...t, rubric: { ...t.rubric, subtotal_without_codal: x.score + cp.pts } }, null); x.score_with_codal = x.score + cp.pts;
+            const e = evFor(x.regime, x.score_with_codal); x.ev5 = e.ev5; x.p_up_5d = e.p5; } }
       }
       // 4) buy-signal sizes: scale down together if they add up to more than 100% of capital
       const buys = rows.filter(x => x.plan && x.plan.signal && x.plan.signal.side === 'buy'), tot = buys.reduce((a, x) => a + x.plan.signal.size, 0);
