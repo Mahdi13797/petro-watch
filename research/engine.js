@@ -119,7 +119,7 @@ function pwEngine(P, opt = {}) {
       const nxDnQ = nx ? (nx.last / nx.y - 1 <= -(nxLim[1] - 0.0015) && nx.last <= nx.l) : null;
       const row = {
         s, d: r.d, j: g2j(r.d), sit, regime, gr20: R(gr20), sub, band: bd, pts: P2, dec, edge, p1: cal ? cal[1] : null, p5: cal ? cal[3] : null, b1: base ? base[1] : null, b5: base ? base[3] : null,
-        upQ, dnQ, lmc: R(lmc, 2), chg: R(100 * chgClose, 2), chgL: R(100 * chgLast, 2), gapT: t ? R(100 * (O[t] / C[t - 1] - 1), 2) : null,
+        upQ, dnQ, lmc: R(lmc, 2), lc: R(LS[t] / C[t], 5), chg: R(100 * chgClose, 2), chgL: R(100 * chgLast, 2), gapT: t ? R(100 * (O[t] / C[t - 1] - 1), 2) : null,
         rsi: R(rsi, 1), pctb: R(pctb, 2), pw: R(pw, 2), pcr: R(pcr, 2), netI: fl && fl.val ? R(fl.netI / fl.val, 3) : null, netN: fl && fl.val ? R(fl.netN / fl.val, 3) : null,
         r5b: t >= 5 ? R(C[t] / C[t - 5] - 1) : null, r20b: t >= 20 ? R(C[t] / C[t - 20] - 1) : null, atr: R(ATR[t] / C[t]), volr: t >= 21 ? R(V[t] / ((vsum[t] - vsum[t - 20]) / 20), 2) : null, val: VAL[t],
         sma20: m20 ? R(C[t] / m20 - 1) : null, sma50: sma(t, 50) ? R(C[t] / sma(t, 50) - 1) : null,

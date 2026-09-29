@@ -91,6 +91,21 @@ const PM = (() => {
     }
     return { text: tsv(out), fitted };
   }
-  return { FEATS, X, logit, table, points, scoreOf, sband, auc, metrics, walk, HEAD, mline, tsv, f2, mean, jy };
+  // tradeable strategies, net of costs (buy 0.37% + sell 0.88% ≈ 1.25% round trip)
+  //  S1: buy before today's close at the LAST price (not possible in a buy queue), sell tomorrow at the average price
+  //      (پایانی); if tomorrow is a sell queue, sell the day after
+  //  S2: buy tomorrow at the average price (not possible if tomorrow is a buy queue), sell the day after (a sell queue → one day later)
+  //  H1: holder's view of a SELL call: sell before today's close at the last price vs keep until tomorrow's close
+  const COST = 0.0125;
+  function strat(rows, p, thr = 0.65) {
+    const sel = rows.filter(r => p(r) >= thr);
+    const s1 = sel.filter(r => !r.upQ && r.lc && r.r1 !== null && (r.nxDnQ ? r.r2 !== null : true)).map(r => (1 + (r.nxDnQ ? r.r2 : r.r1)) / r.lc - 1 - COST);
+    const s2 = sel.filter(r => r.nxUpQ === false && r.tr1 !== null && (r.q2Dn ? r.tr2 !== null : true)).map(r => (r.q2Dn ? r.tr2 : r.tr1) - COST);
+    const selS = rows.filter(r => p(r) <= 1 - thr && !r.dnQ && r.lc && r.r1 !== null).map(r => -((1 + r.r1) / r.lc - 1));
+    const st = v => v.length ? [v.length, f2(100 * mean(v)), Math.round(100 * v.filter(x => x > 0).length / v.length)] : [0, '-', '-'];
+    return [...st(s1), ...st(s2), ...st(selS)];
+  }
+  const SHEAD = ['S1 n', 'S1 net%', 'S1 win%', 'S2 n', 'S2 net%', 'S2 win%', 'H1 n', 'H1 saved%', 'H1 right%'];
+  return { strat, SHEAD, COST, FEATS, X, logit, table, points, scoreOf, sband, auc, metrics, walk, HEAD, mline, tsv, f2, mean, jy };
 })();
 if (typeof window !== 'undefined') window.PM = PM;
