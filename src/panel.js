@@ -160,9 +160,13 @@ const PetroWatch = (() => {
     const sup = ((t.chart && t.chart.levels_sorted_high_to_low) || []).filter(x => x[1] < close * 0.998)[0];
     const res = ((t.chart && t.chart.levels_sorted_high_to_low) || []).filter(x => x[1] > close * 1.002).slice(-1)[0];
     const holdStop = sup ? floor10(sup[1] * 0.99) : floor10(close * (1 - 1.5 * atr));
-    const p = { tradable, score, close, upper, holdStop, state: st };
+    const sit = situation(t);
+    const p = { tradable, score, close, upper, holdStop, state: st, situation: sit.code };
     if (!tradable) return p;
-    if (score >= 4) { // model buy signal
+    // the model's signals are calibrated only for the normal situation (D); after a price adjustment / reopening (B)
+    // or with a short history (C) the model gives no signal (prompt, step 3)
+    if (sit.code !== 'D') { p.signal_blocked = sit.fa; }
+    else if (score >= 4) { // model buy signal
       const stop = Math.max(holdStop, floor10(close * (1 - 1.5 * atr))), dist = (close - stop) / close;
       const tgt = res && res[1] - close >= close - stop ? res[1] : close + 2 * (close - stop);
       p.signal = dist > 0.08 ? null : { side: 'buy', stop, target: Math.round(tgt), size: Math.min(100, 1 / (dist * 100) * 100) };
@@ -179,6 +183,7 @@ const PetroWatch = (() => {
     if (!p.tradable) return h + `<div class="note warn">نماد قابل معامله نیست (${esc(p.state || 'عرضهٔ اولیه')}). اقدامی نیست.</div></div>`;
     if (p.signal && p.signal.side === 'buy') h += `<div class="note" style="background:var(--pos-soft);color:var(--pos)"><b>خرید (سیگنال مدل):</b> جلسهٔ بعد از ۱۱:۰۰ تا پایان جلسه، تا قیمت ${num(p.upper)}؛ در صف خرید نخرید. حد ضرر ${num(p.signal.stop)} · هدف ${num(p.signal.target)} · حدود ${num(p.signal.size, 0, '٪')} سرمایه · خروج حداکثر بعد از ۵ جلسه.</div>`;
     else if (p.signal && p.signal.side === 'sell') h += '<div class="note bad"><b>فروش (سیگنال مدل):</b> اگر دارید، جلسهٔ بعد بعد از ۱۰:۳۰ بفروشید؛ در صف فروش نفروشید.</div>';
+    else if (p.signal_blocked) h += `<div class="note warn">موقعیت ${esc(p.situation)} (${esc(p.signal_blocked)}): جدول احتمال مدل برای این وضعیت معتبر نیست و سیگنال خرید یا فروش داده نمی‌شود.</div>`;
     else h += '<div class="small" style="margin-top:6px">سیگنال خرید یا فروش مدل: <b>ندارد</b>.</div>';
     const g = p.trigger;
     h += `<div class="kv" style="margin-top:8px">${kv('اگر ندارید: خرید اگر پایانی بالای', `<b>${num(g.level)}</b>${g.reachableTomorrow ? '' : ' <span class="muted small">(فردا دست‌یافتنی نیست)</span>'}`)}

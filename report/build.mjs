@@ -72,18 +72,19 @@ function table() {
     const px = `<td>${num(r.close)}<div class="sub">${sgn(r.chg_close_pct, 2, '٪')}</div></td>`;
     if (!r.tradable) return `<tr class="off">${nm}${px}<td colspan="5" class="muted">${r.ipo ? 'عرضهٔ اولیه؛ طبق قاعده‌ها برنامه‌ای ندارد' : esc(r.state || 'قابل معامله نیست')}</td></tr>`;
     const p = r.plan, g = p.trigger || {}, s = p.signal;
-    const trig = `<td><b>${num(g.level)}</b>${g.reachableTomorrow ? '' : ' <span class="tag mute">فردا نمی‌رسد</span>'}${s && s.side === 'buy' ? ' <span class="tag buy">سیگنال خرید</span>' : ''}${s && s.side === 'sell' ? ' <span class="tag sell">سیگنال فروش</span>' : ''}${r.queue_buy ? ' <span class="tag mute">صف خرید بسته شد</span>' : ''}</td>`;
+    const trig = `<td><b>${num(g.level)}</b>${g.reachableTomorrow ? '' : ' <span class="tag mute">فردا نمی‌رسد</span>'}${s && s.side === 'buy' ? ' <span class="tag buy">سیگنال خرید</span>' : ''}${s && s.side === 'sell' ? ' <span class="tag sell">سیگنال فروش</span>' : ''}${r.queue_buy ? ' <span class="tag mute">صف خرید بسته شد</span>' : ''}${r.signal_blocked ? ` <span class="tag warn">${esc(r.signal_blocked)}؛ بدون سیگنال مدل</span>` : ''}</td>`;
     return `<tr class="${rk && rk <= top.length ? 'hl' : ''}">${nm}${px}${trig}<td>${num(g.size, 0, '٪')}</td><td>${num(g.stop)}</td><td>${num(g.target)}</td><td><b>${num(p.holdStop)}</b></td></tr>`;
   }).join('');
   const halted = rows.filter(r => !r.error && !r.tradable).map(r => r.sym);
   return `<div class="tw"><table class="plan"><thead><tr><th>نماد</th><th>پایانی</th><th>اگر ندارید: بخرید اگر پایانی بالای</th><th>مقدار</th><th>حد ضرر بعد از خرید</th><th>هدف</th><th>اگر دارید: حد ضرر</th></tr></thead><tbody>${body}</tbody></table></div>
+    ${rows.some(r => r.signal_blocked) ? '<p class="note">«تعدیل قیمت در روزهای اخیر» یعنی مجمع یا افزایش سرمایه در ۵ جلسهٔ اخیر و بازگشایی نماد؛ جدول احتمال مدل برای این وضعیت ساخته نشده و سیگنال خرید یا فروش داده نمی‌شود.</p>' : ''}
     <p class="note">«پایانی بالای» یعنی بین ۱۲:۱۵ و ۱۲:۳۰ قیمت بالای آن عدد باشد؛ اگر نماد در صف خرید بود نخرید. مقدار = درصد سرمایه.${halted.length ? ` متوقف یا غیرقابل معامله: ${esc(halted.join('، '))}.` : ''}</p>`;
 }
 
 function why() {
   if (!top.length) return '<p class="muted">هیچ نماد قابل معامله‌ای برای رتبه‌بندی نبود.</p>';
   return `<ol class="why">${top.map((x, i) => { const r = rows.find(y => y.sym === x.sym) || {}, p = r.plan || {};
-    const reason = p.signal && p.signal.side === 'buy' ? 'سیگنال خرید مدل دارد' : p.trigger && p.trigger.reachableTomorrow ? `ماشهٔ خرید فردا دست‌یافتنی است (${num(p.trigger.level)}، ${sgn(r.dist_to_trigger_pct, 1, '٪')} نسبت به پایانی)` : 'ماشهٔ خرید فردا دست‌یافتنی نیست؛ بعدی در رتبه‌بندی';
+    const reason = r.signal_blocked ? `${esc(r.signal_blocked)}؛ مدل برای این وضعیت برآورد ندارد و فقط ماشهٔ شکست سقف مانده` : p.signal && p.signal.side === 'buy' ? 'سیگنال خرید مدل دارد' : p.trigger && p.trigger.reachableTomorrow ? `ماشهٔ خرید فردا دست‌یافتنی است (${num(p.trigger.level)}، ${sgn(r.dist_to_trigger_pct, 1, '٪')} نسبت به پایانی)` : 'ماشهٔ خرید فردا دست‌یافتنی نیست؛ بعدی در رتبه‌بندی';
     return `<li><a href="#s-${i + 1}"><b>${esc(x.sym)}</b></a> — ${reason} · بازدهٔ مورد انتظار ۵ روز طبق جدول مدل ${sgn(r.ev5, 1, '٪')} (احتمال رشد ${num(isNum(r.p_up_5d) ? r.p_up_5d * 100 : null, 0, '٪')}) · امتیاز ${sgn(r.score, 0)} · رژیم گروه ${esc(REG[r.regime] || '—')}</li>`; }).join('')}</ol>
     <p class="note">ترتیب: اول سیگنال خرید مدل، بعد ماشه‌ای که فردا دست‌یافتنی است، بعد بازدهٔ مورد انتظار ۵ روزه (احتمال × متوسط سود + (۱ − احتمال) × متوسط زیان در جدول کالیبراسیون)، بعد نزدیکی به ماشه. این عدد میانگین تاریخی موقعیت‌های مشابه است، نه پیش‌بینی سود.</p>`;
 }
@@ -162,7 +163,7 @@ h4 { font-size: 13.5px; margin: 14px 0 4px; }
 .sig ul { margin: 6px 0 0; padding: 0 18px 0 0; display: grid; gap: 4px; }
 .sig.none { background: var(--surface); }
 .tag { display: inline-block; border-radius: 6px; padding: 0 7px; font-size: 11.5px; font-weight: 700; background: var(--surface2); color: var(--muted); white-space: nowrap; }
-.tag.buy { background: var(--pos-soft); color: var(--pos); } .tag.sell { background: var(--neg-soft); color: var(--neg); } .tag.mute { font-weight: 400; }
+.tag.buy { background: var(--pos-soft); color: var(--pos); } .tag.sell { background: var(--neg-soft); color: var(--neg); } .tag.mute { font-weight: 400; } .tag.warn { background: var(--warn-soft); color: var(--warn); }
 .tw { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: right; color: var(--muted); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--line); padding: 6px 8px; white-space: nowrap; }

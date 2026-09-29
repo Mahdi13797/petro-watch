@@ -2,12 +2,12 @@
  "tool": "petro-watch",
  "version": "2.3.0",
  "symbol": "نمونه",
- "collected_at": "2026-09-29T15:35:39.133Z",
+ "collected_at": "2026-09-29T15:42:00.800Z",
  "codal_days": 120,
  "tsetmc": {
   "symbol": "نمونه",
   "version": 2,
-  "generated_at": "2026-09-29T15:35:39.147Z",
+  "generated_at": "2026-09-29T15:42:00.815Z",
   "warnings": [],
   "instrument": {
    "insCode": "1234567890123456",

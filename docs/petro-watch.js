@@ -1025,12 +1025,13 @@ function pwMakeReport(PC, planOf, net) {
         return { sym: s, name: fa(t.instrument && t.instrument.name), state: fa(t.instrument && t.instrument.state), ipo: !!t.ipo, tradable: p.tradable, date: d.date,
           close: d.close, last: d.last, chg_close_pct: d.chg_close_pct, high: d.high, atr_pct: d.atr_pct, value_today: d.value_today,
           queue_buy: !!d.closed_at_upper_limit, queue_sell: !!d.closed_at_lower_limit, score: r.subtotal_without_codal || 0, band: r.band_without_codal,
-          regime: r.regime || (t.group && t.group.regime), ev5: R(cal5(r), 2), p_up_5d: r.calibration_for_this_band && r.calibration_for_this_band.p_up_5d,
+          regime: r.regime || (t.group && t.group.regime), situation: p.situation, signal_blocked: p.signal_blocked || null,
+          adjusted_recently: (d.adjustments_last_year || []).filter(a => a[0] >= tehranInt(7)).map(a => a[1]), ev5: p.situation === 'D' ? R(cal5(r), 2) : null, p_up_5d: r.calibration_for_this_band && r.calibration_for_this_band.p_up_5d,
           calib_group_ok: r.calibration_applies_to_this_group !== false, plan: p, codal: null };
       });
       // 3) light Codal check for model signals only (5 s apart; one retry after 60 s on 429)
       if (opts.codal !== false) {
-        const sig = rows.filter(x => !x.error && x.tradable && Math.abs(x.score) >= 4);
+        const sig = rows.filter(x => !x.error && x.tradable && x.situation === 'D' && Math.abs(x.score) >= 4);
         for (let i = 0; i < sig.length; i++) { const x = sig[i]; st.note = 'کدال ' + x.sym; if (i) await sleep(5000);
           const c = await lightCodal(x.sym);
           if (!c.ok) { x.codal = { checked: false, why: c.why }; continue; }
@@ -1044,7 +1045,8 @@ function pwMakeReport(PC, planOf, net) {
       rows.forEach(x => { if (x.error || !x.tradable) { x.prio = 0; return; }
         const pl = x.plan, sell = pl.signal && pl.signal.side === 'sell';
         x.dist_to_trigger_pct = pl.trigger && x.close ? R(100 * (pl.trigger.level / x.close - 1), 2) : null;
-        x.prio = sell ? 0 : pl.signal && pl.signal.side === 'buy' ? 3 : pl.trigger && pl.trigger.reachableTomorrow ? 2 : 1; });
+        // outside the normal situation (reopening after an adjustment, short history) the model has no edge estimate: lowest priority
+        x.prio = sell ? 0 : x.situation !== 'D' ? 1 : pl.signal && pl.signal.side === 'buy' ? 3 : pl.trigger && pl.trigger.reachableTomorrow ? 2 : 1; });
       const ranked = rows.filter(x => x.prio > 0).sort((a, b) => b.prio - a.prio || (b.ev5 ?? -99) - (a.ev5 ?? -99) || (a.dist_to_trigger_pct ?? 99) - (b.dist_to_trigger_pct ?? 99) || (b.value_today || 0) - (a.value_today || 0));
       ranked.forEach((x, i) => { x.rank = i + 1; });
       const topN = opts.top || 2, top = ranked.slice(0, topN).map(x => {
@@ -1243,9 +1245,13 @@ const PetroWatch = (() => {
     const sup = ((t.chart && t.chart.levels_sorted_high_to_low) || []).filter(x => x[1] < close * 0.998)[0];
     const res = ((t.chart && t.chart.levels_sorted_high_to_low) || []).filter(x => x[1] > close * 1.002).slice(-1)[0];
     const holdStop = sup ? floor10(sup[1] * 0.99) : floor10(close * (1 - 1.5 * atr));
-    const p = { tradable, score, close, upper, holdStop, state: st };
+    const sit = situation(t);
+    const p = { tradable, score, close, upper, holdStop, state: st, situation: sit.code };
     if (!tradable) return p;
-    if (score >= 4) { // model buy signal
+    // the model's signals are calibrated only for the normal situation (D); after a price adjustment / reopening (B)
+    // or with a short history (C) the model gives no signal (prompt, step 3)
+    if (sit.code !== 'D') { p.signal_blocked = sit.fa; }
+    else if (score >= 4) { // model buy signal
       const stop = Math.max(holdStop, floor10(close * (1 - 1.5 * atr))), dist = (close - stop) / close;
       const tgt = res && res[1] - close >= close - stop ? res[1] : close + 2 * (close - stop);
       p.signal = dist > 0.08 ? null : { side: 'buy', stop, target: Math.round(tgt), size: Math.min(100, 1 / (dist * 100) * 100) };
@@ -1262,6 +1268,7 @@ const PetroWatch = (() => {
     if (!p.tradable) return h + `<div class="note warn">نماد قابل معامله نیست (${esc(p.state || 'عرضهٔ اولیه')}). اقدامی نیست.</div></div>`;
     if (p.signal && p.signal.side === 'buy') h += `<div class="note" style="background:var(--pos-soft);color:var(--pos)"><b>خرید (سیگنال مدل):</b> جلسهٔ بعد از ۱۱:۰۰ تا پایان جلسه، تا قیمت ${num(p.upper)}؛ در صف خرید نخرید. حد ضرر ${num(p.signal.stop)} · هدف ${num(p.signal.target)} · حدود ${num(p.signal.size, 0, '٪')} سرمایه · خروج حداکثر بعد از ۵ جلسه.</div>`;
     else if (p.signal && p.signal.side === 'sell') h += '<div class="note bad"><b>فروش (سیگنال مدل):</b> اگر دارید، جلسهٔ بعد بعد از ۱۰:۳۰ بفروشید؛ در صف فروش نفروشید.</div>';
+    else if (p.signal_blocked) h += `<div class="note warn">موقعیت ${esc(p.situation)} (${esc(p.signal_blocked)}): جدول احتمال مدل برای این وضعیت معتبر نیست و سیگنال خرید یا فروش داده نمی‌شود.</div>`;
     else h += '<div class="small" style="margin-top:6px">سیگنال خرید یا فروش مدل: <b>ندارد</b>.</div>';
     const g = p.trigger;
     h += `<div class="kv" style="margin-top:8px">${kv('اگر ندارید: خرید اگر پایانی بالای', `<b>${num(g.level)}</b>${g.reachableTomorrow ? '' : ' <span class="muted small">(فردا دست‌یافتنی نیست)</span>'}`)}
