@@ -164,9 +164,10 @@ const PetroWatch = (() => {
   function swingCard(t) {
     const w = t.swing; if (!w) return '';
     const bt = w.backtest || {}, r7 = (bt.rule_7d || {}).test_1403_1405 || {}, rw = (bt.rule_7d_weak_finish || {}).test_1403_1405 || {}, r5 = (bt.rule_5d || {}).test_1403_1405 || {};
+    const v0 = x => Array.isArray(x) ? x[0] : x, ci = x => Array.isArray(x) && x.length === 3 ? ` <span class="muted">[${num(x[1], 1)} تا ${num(x[2], 1)}]</span>` : '';
     const DEC = { BUY_SWING: ['خرید برای نگهداری ۷ جلسه', 'ok'], WAIT_MARKET: ['صبر: بازار مساعد نیست', 'warn'], SKIP: ['این نماد الان نه', ''] };
     const [lbl, cls] = DEC[w.decision] || ['—', ''];
-    let h = `<div class="card"><div><b>برنامهٔ چندروزه</b> <span class="muted small">نسخهٔ ۲٫۴ · قاعدهٔ آزموده روی ۱۱ پالایشی</span></div>
+    let h = `<div class="card"><div><b>برنامهٔ چندروزه</b> <span class="muted small">نسخهٔ ۲٫۵ · قاعدهٔ آزموده روی ۱۱ پالایشی</span></div>
       <div class="chips"><span class="badge ${cls}">${lbl}</span>${w.priority ? `<span class="badge">اولویت ${esc(w.priority)}${w.priority === 'A' ? ' (پایان ضعیف امروز)' : ''}</span>` : ''}</div>`;
     if (w.note) h += `<div class="note warn">${esc(w.note)}</div>`;
     if ((w.reasons_skip || []).length) h += `<ul class="warns">${w.reasons_skip.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
@@ -174,9 +175,9 @@ const PetroWatch = (() => {
     if (p) h += `<div class="kv">${kv('ورود', esc(p.entry))}${kv('نگهداری', `${nf(p.hold_sessions)} جلسه <span class="muted small">(یا ${nf(p.alt_hold_sessions)})</span>`)}
       ${kv('حد ضرر', `${num(p.stop_pct * 100, 1, '٪')} زیر قیمت خرید · اگر با پایانی امروز بخرید: <b>${num(p.stop_if_entry_at_today_close)}</b>`)}${kv('فروش', esc(p.exit))}
       ${kv('قیمت‌های مرجع ۷ جلسه (چارک پایین / میانه / چارک بالا)', num(p.reference_prices_7d.p25) + ' / ' + num(p.reference_prices_7d.median) + ' / ' + num(p.reference_prices_7d.p75))}
-      ${kv('حجم با ریسک ۱٪ سرمایه', num(p.position_pct_of_capital_at_1pct_risk, 1, '٪') + ' سرمایه')}</div><p class="small">${esc(p.stop_rule)}. ${esc(p.note_targets)}</p>`;
-    h += `<p class="muted small">آزمون خارج از نمونه ۱۴۰۳ تا ۱۴۰۵ بعد از هزینه: ۷ جلسه میانگین ${sgn(r7.mean_net_pct, 1, '٪')}، برد ${num(r7.win_pct, 0, '٪')} (n = ${nf(r7.n)})؛
-      با پایان ضعیف ${sgn(rw.mean_net_pct, 1, '٪')}، برد ${num(rw.win_pct, 0, '٪')} (n = ${nf(rw.n)})؛ ۵ جلسه ${sgn(r5.mean_net_pct, 1, '٪')}؛ ۳ جلسه تقریباً صفر. ${esc(bt.note || '')}</p></div>`;
+      ${kv(`حجم با ریسک ${num(p.risk_per_trade_pct || 1, 2, '٪')} سرمایه`, num(p.position_pct_of_capital || p.position_pct_of_capital_at_1pct_risk, 1, '٪') + ' سرمایه')}</div><p class="small">${esc(p.stop_rule)}. ${esc(p.note_targets)}</p>${p.portfolio_rules ? `<p class="small">${esc(p.portfolio_rules)}</p>` : ''}`;
+    h += `<p class="muted small">آزمون خارج از نمونه ۱۴۰۳ تا ۱۴۰۵ بعد از هزینه: ۷ جلسه میانگین ${sgn(v0(r7.mean_net_pct), 1, '٪')}${ci(r7.mean_net_pct)}، برد ${num(v0(r7.win_pct), 0, '٪')} (n = ${nf(r7.n)})؛
+      با پایان ضعیف ${sgn(v0(rw.mean_net_pct), 1, '٪')}${ci(rw.mean_net_pct)}، برد ${num(v0(rw.win_pct), 0, '٪')} (n = ${nf(rw.n)})؛ ۵ جلسه ${sgn(v0(r5.mean_net_pct), 1, '٪')}؛ ۳ جلسه تقریباً صفر. ${esc(bt.note || '')}</p></div>`;
     return h;
   }
   function replayCard(b) {

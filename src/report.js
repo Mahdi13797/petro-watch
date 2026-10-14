@@ -76,7 +76,7 @@ function pwMakeReport(PC, planOf, net) {
           next: t.next_session ? { call: t.next_session.call, band: t.next_session.band, prob: t.next_session.prob, applies: t.next_session.applies } : null,
           swing: t.swing ? { decision: t.swing.decision, priority: t.swing.priority, gate_open: t.swing.gate_open, reasons: t.swing.reasons_skip, applies: t.swing.applies,
             stop_pct: t.swing.plan && t.swing.plan.stop_pct, stop: t.swing.plan && t.swing.plan.stop_if_entry_at_today_close, refs: t.swing.plan && t.swing.plan.reference_prices_7d,
-            size: t.swing.plan && t.swing.plan.position_pct_of_capital_at_1pct_risk } : null };
+            size: t.swing.plan && (t.swing.plan.position_pct_of_capital || t.swing.plan.position_pct_of_capital_at_1pct_risk), risk: t.swing.plan && t.swing.plan.risk_per_trade_pct } : null };
       });
       // 3) light Codal check for model signals only (5 s apart; one retry after 60 s on 429)
       if (opts.codal !== false) {

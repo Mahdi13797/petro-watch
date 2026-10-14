@@ -19,7 +19,7 @@ const report = read('src/report.js');
 const panel = read('src/panel.js');
 const css = read('src/panel.css');
 // the prompt carries the collector code in its appendix; keep that block identical to src/petro_collector.js
-const PROMPT_FILE = 'prompt/Petro_Agent_Prompt_FA_v2_4.md';
+const PROMPT_FILE = 'prompt/Petro_Agent_Prompt_FA_v2_5.md';
 let prompt = read(PROMPT_FILE);
 {
   const head = '## ۹. پیوست ب', i = prompt.indexOf(head), a = prompt.indexOf('```javascript\n', i), b = prompt.indexOf('\n```', a + 14);

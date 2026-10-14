@@ -13,6 +13,10 @@
    v2.1.2: group block uses the symbol's own sector (e.g. 23 = refineries) and its index for regime; codal peers follow the group.
    v2.3: `technical` block — OHLC (daily 320 bars, weekly 104) for drawing, Fibonacci, pivots, Ichimoku, Stochastic, Bollinger/MACD values,
          RSI divergence, candlestick and chart patterns, each with its 13-year backtest edge (techtools.py).
+   v2.5: (review of 1405/07/16; data re-run to 1405/07/21, research/ci.js)
+         · group-44 calibration recomputed with n, 90% block-bootstrap CI of the edge, EV after cost; decision needs CI and EV, BUY capped at low confidence
+         · next_session: n and 90% CI of up / flat / down per band; walk-forward text with CIs; weights = fit on all data to 1405/07/08
+         · swing: default risk 0.67% per trade (3 open ≤ 2% portfolio heat), kill switch, participation cap, CIs and cost sensitivity in `backtest`
    v2.4: (replay test of 11 refiners, 1392-1405, research/ in the repo)
          · petroSnapshot(symbol, { asOf: '1403/07/07' }) rebuilds the snapshot as of the close of a past session (no future data)
          · petroReplay(symbol, date) = as-of snapshot + what really happened next (`outcome`) + automatic check with reasons
@@ -40,7 +44,7 @@ async function petroSnapshot(symbol, opts = {}) {
   };
   const ar = s => (s || '').replace(/ی/g, 'ي').replace(/ک/g, 'ك').replace(/\s+/g, ' ').trim();
   const R = (x, d = 4) => (x === null || x === undefined || !isFinite(x)) ? null : Math.round(x * 10 ** d) / 10 ** d;
-  const out = { symbol, version: 2.4, generated_at: new Date().toISOString(), warnings: [] };
+  const out = { symbol, version: 2.5, generated_at: new Date().toISOString(), warnings: [] };
   // as-of (replay) mode: '1403/07/07' (Latin or Persian digits) or a Gregorian dEven like 20240928
   const jalOf = dEv => { const s = String(dEv); return new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8)))).replace(/[^\d/]/g, ''); };
   let asOfJ = null, asOfD = null;
@@ -537,17 +541,26 @@ async function petroSnapshot(symbol, opts = {}) {
     strategic_holder_buy_5d: hd.some(x => strat.includes(x.type) && x.delta_shares > 0 && Math.abs(x.value_billion_toman) >= 1),
     strategic_holder_sell_5d: hd.some(x => strat.includes(x.type) && x.delta_shares < 0 && Math.abs(x.value_billion_toman) >= 1),
     close_above_last_swing_high: out.chart.close_above_last_swing_high, close_below_last_swing_low: out.chart.close_below_last_swing_low };
-  // calibration 1392-1405, tradable days only: [n, P(up 1d), P(up 3d), P(up 5d), P(up 10d), median 5d %, avg gain 5d %, avg loss 5d %]
-  const CAL = { hot: { '<=-4': [30, .10, .23, .20, .27, -3.3, 3.4, -5.6], '-3..-2': [2575, .25, .52, .55, .58, 0.8, 6.7, -4.8], '-1..+1': [9398, .51, .54, .57, .61, 1.0, 6.4, -4.2], '+2..+3': [2332, .76, .56, .57, .60, 1.1, 7.0, -4.5], '>=+4': [141, .87, .72, .74, .78, 4.4, 10.1, -3.5], ALL: [14476, .50, .54, .57, .61, 1.0, 6.6, -4.4] },
-    mid: { '<=-4': [1313, .11, .26, .31, .40, -0.6, 3.3, -2.3], '-3..-2': [9771, .23, .38, .41, .45, -0.5, 5.6, -3.0], '-1..+1': [29601, .44, .46, .48, .50, -0.1, 5.8, -3.1], '+2..+3': [5726, .73, .54, .54, .54, 0.3, 9.9, -3.3], '>=+4': [441, .81, .60, .58, .58, 0.5, 5.2, -3.1], ALL: [46852, .43, .45, .47, .49, -0.2, 6.3, -3.0] },
-    cold: { '<=-4': [535, .18, .36, .38, .46, -0.6, 4.1, -2.5], '-3..-2': [2789, .31, .42, .43, .48, -0.5, 4.6, -3.4], '-1..+1': [5497, .49, .46, .47, .49, -0.2, 5.2, -4.0], '+2..+3': [1177, .76, .49, .50, .49, 0.0, 5.9, -4.4], '>=+4': [65, .77, .62, .57, .54, 1.9, 7.2, -4.9], ALL: [10063, .45, .45, .46, .48, -0.3, 5.1, -3.8] } };
+  // calibration v2.5 (recomputed 1405/07/22 on 1392-1405, 67 listed group-44 stocks, 30% least-traded per year dropped, tradable days only)
+  // [n, P(up 1d close→close), P(up 3d), P(up 5d), P(up 10d) — multi-day columns from the NEXT session's close (tradable),
+  //  median 5d %, avg gain 5d %, avg loss 5d %, edge-5d 90% CI low, high (block bootstrap by day, pp vs the regime base)]
+  const CAL = { hot: { '<=-4': [38, .13, .26, .21, .29, -1.8, 6.1, -5.8, -46.2, -18.6], '-3..-2': [2497, .25, .53, .55, .57, 1.0, 7.5, -5.1, -5.6, -1.0], '-1..+1': [9190, .50, .57, .59, .63, 1.4, 7.2, -4.6, -0.6, 0.9], '+2..+3': [2393, .76, .58, .61, .63, 2.0, 7.6, -4.8, 0.6, 4.8], '>=+4': [140, .81, .70, .71, .76, 4.3, 8.8, -3.3, 5.0, 19.9], ALL: [14258, .51, .56, .59, .62, 1.5, 7.3, -4.7] },
+    mid: { '<=-4': [1551, .10, .26, .30, .38, -0.8, 3.9, -2.4, -20.1, -13.5], '-3..-2': [9992, .23, .39, .41, .45, -0.6, 4.9, -3.3, -7.3, -4.7], '-1..+1': [28252, .44, .47, .48, .50, -0.1, 5.0, -3.4, 0.6, 1.9], '+2..+3': [5617, .72, .55, .55, .55, 0.4, 5.8, -3.6, 6.6, 9.4], '>=+4': [480, .79, .61, .59, .60, 0.7, 5.6, -3.2, 7.4, 15.0], ALL: [45892, .42, .45, .47, .49, -0.2, 5.1, -3.4] },
+    cold: { '<=-4': [607, .18, .37, .40, .46, -0.6, 4.5, -2.9, -9.7, -0.6], '-3..-2': [2877, .30, .41, .43, .47, -0.5, 5.4, -3.8, -4.6, -0.5], '-1..+1': [5235, .48, .46, .47, .48, -0.3, 6.0, -4.5, 0.6, 2.9], '+2..+3': [1135, .75, .49, .47, .48, -0.3, 6.4, -4.8, -1.1, 4.6], '>=+4': [66, .76, .52, .49, .53, -0.1, 8.8, -4.3, -7.0, 12.2], ALL: [9920, .44, .44, .45, .48, -0.4, 5.8, -4.2] } };
   const band = s => s <= -4 ? '<=-4' : s <= -2 ? '-3..-2' : s <= 1 ? '-1..+1' : s <= 3 ? '+2..+3' : '>=+4';
   const cal = CAL[regime][band(sub)], base = CAL[regime].ALL;
   const newIPO = ipoIdx >= 0 && hist <= 120;
   out.rubric = { version: 2, points: P, subtotal_without_codal: sub, band_without_codal: band(sub), regime, context,
-    calibration_for_this_band: { n: cal[0], p_up_1d: cal[1], p_up_3d: cal[2], p_up_5d: cal[3], p_up_10d: cal[4], median_5d_pct: cal[5], avg_gain_5d_pct: cal[6], avg_loss_5d_pct: cal[7] },
+    calibration_for_this_band: { n: cal[0], p_up_1d: cal[1], p_up_3d: cal[2], p_up_5d: cal[3], p_up_10d: cal[4], median_5d_pct: cal[5], avg_gain_5d_pct: cal[6], avg_loss_5d_pct: cal[7],
+      ev_5d_gross_pct: R(cal[3] * cal[6] + (1 - cal[3]) * cal[7], 2), ev_5d_net_pct: R(cal[3] * cal[6] + (1 - cal[3]) * cal[7] - 1.25, 2),
+      note: '۱ روزه = پایانی امروز تا پایانی فردا (قابل معامله نیست، فقط اطلاع)؛ ۳، ۵ و ۱۰ روزه = از پایانی جلسهٔ بعد (قابل معامله). EV = p×سود متوسط + (1−p)×زیان متوسط، ۵ روزه، net یعنی بعد از هزینهٔ ۱٫۲۵٪' },
     base_rate_this_regime: { p_up_1d: base[1], p_up_5d: base[3], median_5d_pct: base[5] },
-    edge_vs_base_5d_pp: Math.round(100 * (cal[3] - base[3])),
+    edge_vs_base_5d_pp: Math.round(100 * (cal[3] - base[3])), edge_ci90_pp: cal.length > 8 ? [cal[8], cal[9]] : null,
+    decision_v25: (() => { if (newIPO) return 'NA'; const e = Math.round(100 * (cal[3] - base[3])), ev = cal[3] * cal[6] + (1 - cal[3]) * cal[7] - 1.25;
+      if (e >= 8 && cal[8] > 0 && cal[3] >= 0.55 && ev > 0.5 && !d.closed_at_upper_limit) return 'BUY_LOW_CONFIDENCE_HALF_SIZE';
+      if (e <= -8 && cal[9] < 0 && cal[3] <= 0.40 && !d.closed_at_lower_limit) return cal[0] < 100 ? 'SELL_SMALL_SAMPLE' : 'SELL';
+      return 'NO_EDGE'; })(),
+    decision_rule_v25: 'خرید: لبه ≥ +۸ واحد و کران پایین بازهٔ ۹۰٪ لبه > ۰ و احتمال ۵ روزه ≥ ۵۵٪ و EV خالص ۵ روزه > +۰٫۵٪؛ در walk-forward سمت خرید معنادار نبود (+۳٫۹ [−۳٫۱، +۱۰٫۶]) پس اطمینان «پایین» و نصف حجم. فروش: لبه ≤ −۸ و کران بالا < ۰ و احتمال ≤ ۴۰٪ (walk-forward: −۱۵٫۷ [−۲۱٫۲، −۹٫۰]).',
     applicable: !newIPO, calibrated_on_group: '44', calibration_applies_to_this_group: SEC === '44',
     note: newIPO ? 'سهم تازه‌عرضه است: جدول کالیبراسیون قابل‌اتکا نیست؛ از بلوک ipo استفاده کن' : 'امتیاز کدال را اضافه کن و باند را دوباره تعیین کن؛ لبه = اختلاف با نرخ پایهٔ همین رژیم',
     tradability: d.closed_at_upper_limit ? 'در صف خرید بسته شده — خرید عملاً ممکن نیست' : d.closed_at_lower_limit ? 'در صف فروش بسته شده — فروش عملاً ممکن نیست' : 'قابل معامله' };
@@ -577,10 +590,15 @@ async function petroSnapshot(symbol, opts = {}) {
     const bd = sc <= -6 ? '<=-6' : sc <= -4 ? '-5..-4' : sc <= -2 ? '-3..-2' : sc <= 1 ? '-1..+1' : sc <= 3 ? '+2..+3' : sc <= 5 ? '+4..+5' : '>=+6';
     // [n, up>0.5%, flat ±0.5%, down<-0.5%, up(>0)%, median next-day %, median gap %, next buy queue %, next sell queue %,
     //  median from today's LAST price to tomorrow's پایانی % (rows not in a buy queue), median from the last price to 5 sessions later %, up in 5 %, median 5-day %]
-    const TAB = { '<=-6': [1621, 6, 39, 55, 9, -0.67, -2.98, 4, 55, 1.12, 0.29, 22, -2.08], '-5..-4': [3318, 11, 38, 51, 17, -0.54, -1.66, 4, 18, 0.98, 0.62, 33, -1.18],
-      '-3..-2': [4795, 18, 36, 46, 29, -0.39, -0.56, 5, 12, 0.14, 0.00, 41, -0.63], '-1..+1': [12017, 34, 34, 33, 48, 0.00, 0.14, 8, 5, 0.03, 0.18, 51, 0.14],
-      '+2..+3': [2835, 56, 27, 17, 71, 0.76, 1.59, 17, 4, -0.40, 0.00, 62, 1.27], '+4..+5': [1911, 69, 15, 16, 78, 2.03, 2.76, 35, 6, -0.32, 0.05, 68, 2.86],
-      '>=+6': [2662, 84, 9, 7, 90, 2.94, 2.99, 61, 3, -0.14, 1.05, 80, 6.38] };
+    const TAB = { '<=-6': [1619, 6, 39, 55, 9, -0.67, -2.98, 4, 55, 1.12, 0.29, 22, -2.08], '-5..-4': [3302, 11, 38, 51, 17, -0.54, -1.66, 4, 18, 0.98, 0.62, 33, -1.18],
+      '-3..-2': [4799, 18, 36, 46, 29, -0.39, -0.56, 5, 12, 0.14, 0.00, 41, -0.63], '-1..+1': [12079, 34, 34, 33, 48, 0.00, 0.14, 8, 5, 0.03, 0.18, 51, 0.14],
+      '+2..+3': [2840, 56, 27, 17, 71, 0.76, 1.59, 17, 4, -0.40, 0.00, 62, 1.27], '+4..+5': [1929, 69, 15, 16, 78, 2.03, 2.76, 35, 6, -0.32, 0.05, 68, 2.86],
+      '>=+6': [2680, 84, 9, 7, 90, 2.94, 2.99, 61, 3, -0.14, 1.05, 80, 6.38] };
+    // v2.5: 90% CI (block bootstrap by day, blocks of 5 days) of up / flat / down, and net % from today's last price to tomorrow's close after 1.25% cost
+    const TCI = { '<=-6': { up: [4.5, 7.0], flat: [34.3, 43.2], down: [51.1, 60.0], days: 683, net1: [-0.3, -0.5, 0.0] }, '-5..-4': { up: [9.5, 11.7], flat: [36.0, 40.6], down: [48.9, 53.3], days: 1709, net1: [-0.6, -0.7, -0.4] },
+      '-3..-2': { up: [16.2, 18.9], flat: [33.4, 38.0], down: [44.7, 48.6], days: 2087, net1: [-0.7, -1.1, -0.4] }, '-1..+1': { up: [32.5, 34.8], flat: [32.5, 35.3], down: [31.3, 33.6], days: 2827, net1: [-1.0, -1.1, -1.0] },
+      '+2..+3': { up: [54.0, 57.8], flat: [25.2, 29.2], down: [15.4, 18.3], days: 1625, net1: [-1.4, -1.5, -1.3] }, '+4..+5': { up: [67.4, 71.4], flat: [13.4, 16.7], down: [14.1, 17.3], days: 1104, net1: [-1.5, -1.7, -1.3] },
+      '>=+6': { up: [82.2, 86.3], flat: [7.6, 10.9], down: [5.6, 8.0], days: 958, net1: [-1.1, -1.4, -0.7] } };
     const T = TAB[bd], call = T[1] >= 50 ? 'UP' : T[3] >= 45 ? 'DOWN' : 'NONE';
     const adj7 = (d.adjustments_last_year || []).some(a => (Date.UTC(+String(last.d).slice(0, 4), +String(last.d).slice(4, 6) - 1, +String(last.d).slice(6, 8)) - Date.UTC(+String(a[0]).slice(0, 4), +String(a[0]).slice(4, 6) - 1, +String(a[0]).slice(6, 8))) / 864e5 <= 7);
     const sit = newIPO ? 'A' : adj7 ? 'B' : hist < 60 ? 'C' : 'D';
@@ -589,12 +607,14 @@ async function petroSnapshot(symbol, opts = {}) {
     if (REPLAY && out.replay.next_session_dEven) { const gd = (at1230(out.replay.next_session_dEven) - tClose) / 864e5; if (gd >= 4) flags.push(`فاصلهٔ ${Math.round(gd)} روزه تا جلسهٔ بعد: خطای جهت در این حالت ۲۰٪ بود (در برابر ۱۳٪)`); }
     if (uq) flags.push(`صف خرید: فردا دوباره صف خرید ${d.buy_queue_streak_before_today >= 4 ? '۷۸' : d.buy_queue_streak_before_today >= 2 ? '۷۲' : vr !== null && vr > 1.5 ? '۴۱' : '۴۱ تا ۵۲'}٪، صف فروش حدود ۴٪ (با افت شبانهٔ دلار بیش از ۱٪: ۱۲٪)`);
     if (dq) flags.push(`صف فروش: فردا دوباره صف فروش ${d.sell_queue_streak_before_today >= 2 ? '۶۷' : vr !== null && vr > 1.5 ? '۴۱' : '۳۹ تا ۴۹'}٪، صف خرید حدود ۷٪ (در ۱۴۰۳ تا ۱۴۰۵: ۱۲٪)`);
-    out.next_session = { version: '2.4', applies: SEC === '23' && sit === 'D', situation: sit, calibrated_on: '۱۱ نماد پالایشی گروه ۲۳، ۱۳۹۲ تا ۱۴۰۵ (حدود ۲۹ هزار روز-نماد)',
+    out.next_session = { version: '2.5', applies: SEC === '23' && sit === 'D', situation: sit, calibrated_on: '۱۱ نماد پالایشی گروه ۲۳، ۱۳۹۲ تا ۱۴۰۵ (حدود ۲۹ هزار روز-نماد)',
       points: pts, score: sc, band: bd, call, prob: { up: T[1] / 100, flat: T[2] / 100, down: T[3] / 100, up_any: T[4] / 100 }, n: T[0],
+      ci90_pct: { up: TCI[bd].up, flat: TCI[bd].flat, down: TCI[bd].down }, distinct_days: TCI[bd].days, one_day_trade_net_pct_ci90: TCI[bd].net1,
+      scoring_note: 'ردیف‌ها جمع می‌شوند (مثلاً صف خرید کم‌حجم روز سوم = ۳ + ۲ + ۱ = +۶)؛ سقف امتیاز ندارد؛ ناحیه‌های دو سر باز است. وزن‌ها: برازش روی همهٔ داده تا ۱۴۰۵/۰۷/۰۸؛ در foldهای walk-forward حداکثر ۲ ردیف ۱ امتیاز فرق داشت.',
       expected: { next_close_median_pct: T[5], open_gap_median_pct: T[6], next_buy_queue_pct: T[7], next_sell_queue_pct: T[8], from_last_price_to_next_close_median_pct: T[9],
         from_last_price_to_5d_median_pct: T[10], up_in_5d_pct: T[11], five_day_median_pct: T[12], round_trip_cost_pct: 1.25 },
       can_buy_now: !uq, can_sell_now: !dq, confidence_flags: flags,
-      walk_forward: 'آزمون خارج از نمونه (هر سال فقط با سال‌های قبل): وقتی پیش‌بینی جهت داد و حرکت بی‌حرکت نبود، ۸۱ تا ۸۵٪ درست بود؛ خلاف جهت ۱۰ تا ۱۵٪؛ بی‌حرکت ۶ تا ۳۸٪ (۱۴۰۳ تا ۱۴۰۵)',
+      walk_forward: 'درستی جهت بدون بی‌حرکت‌ها (بازهٔ ۹۰٪): ۱۴۰۳: ۸۴ [۸۱، ۸۷]، ۱۴۰۴: ۸۱ [۷۸، ۸۵]، ۱۴۰۵: ۸۵ [۸۰، ۸۹]؛ خلاف جهت ۱۰ تا ۱۵٪؛ بی‌حرکت ۶ تا ۳۸٪. بعد از انجماد ۱۴۰۵/۰۷/۰۸ (۸ روز، ۳۰ پیش‌بینی) ۹۶٪، نمونه خیلی کوچک.',
       note: SEC === '23' ? (sit === 'D' ? 'قیمت «پایانی» یعنی میانگین وزنی روز؛ بخش بزرگ این پیش‌بینی از فاصلهٔ آخرین قیمت امروز با پایانی می‌آید و قبل از فردا در قیمت هست. از آخرین قیمت امروز، حرکت مورد انتظار در همهٔ ناحیه‌ها از هزینهٔ رفت‌وبرگشت ۱٫۲۵٪ کمتر است.' : 'موقعیت غیرعادی (A/B/C): جدول معتبر نیست')
         : 'این جدول روی پالایشی‌ها برآورد شده؛ برای این گروه آزموده نشده. برای جلسهٔ بعد از rubric.calibration_for_this_band.p_up_1d استفاده کن.' };
   }
@@ -614,19 +634,29 @@ async function petroSnapshot(symbol, opts = {}) {
     if (d.rsi14 !== null && d.rsi14 > 80) why.push(`RSI ${d.rsi14} (بالای ۸۰؛ در آزمون زیان‌ده)`);
     if (d.ret_20d !== null && d.ret_20d > 0.40) why.push(`بازده ۲۰ روزه ${R(100 * d.ret_20d, 1)}٪ (بیش از ۴۰٪؛ در آزمون زیان‌ده)`);
     const ok = why.length === 0, weak = d.last_minus_close_pct < -1, atr = d.atr_pct || 0.035, stopPct = R(Math.max(0.03, 2 * atr), 4);
+    const risk = opts.risk || 0.0067;   // v2.5: 0.67% of capital per trade → 3 open trades ≤ 2% portfolio heat
     const px = k => Math.round(d.close * (1 + k) / 10) * 10;
-    out.swing = { version: '2.4', applies: SEC === '23', gate_open: gate, decision: !gate ? 'WAIT_MARKET' : ok ? 'BUY_SWING' : 'SKIP', priority: ok ? (weak ? 'A' : 'B') : null, reasons_skip: why,
+    out.swing = { version: '2.5', applies: SEC === '23', gate_open: gate, decision: !gate ? 'WAIT_MARKET' : ok ? 'BUY_SWING' : 'SKIP', priority: ok ? (weak ? 'A' : 'B') : null, reasons_skip: why,
       plan: ok ? { entry: 'جلسهٔ بعد، در طول جلسه نزدیک میانگین روز (قیمت پایانی)، نه در بازگشایی؛ اگر صف خرید شد نخر', hold_sessions: 7, alt_hold_sessions: 5,
         stop_pct: stopPct, stop_if_entry_at_today_close: px(-stopPct), stop_rule: 'اگر در هر جلسه کف روز به حد ضرر رسید بفروش؛ اگر زیر آن باز شد در بازگشایی؛ در صف فروش قفل، اولین جلسهٔ ممکن',
         exit: 'قیمت پایانی جلسهٔ هفتم بعد از خرید (یا پنجم)', reference_prices_7d: { p25: px(-0.025), median: px(0.032), p75: px(0.094) },
-        position_pct_of_capital_at_1pct_risk: R(1 / stopPct, 1), note_targets: 'هدف ثابت (مثلاً ۳ برابر حد ضرر) در آزمون بازده را کم کرد؛ خروج زمانی بهتر بود. قیمت‌های مرجع هدف سفارش نیستند.' } : null,
-      backtest: { rule_7d: { test_1403_1405: { n: 259, mean_net_pct: 2.2, median_net_pct: 3.0, win_pct: 60 }, train_1397_1402: { n: 1514, mean_net_pct: 3.0, win_pct: 59 }, years_positive: '۹ از ۹ (۱۳۹۷ تا ۱۴۰۵)' },
-        rule_7d_weak_finish: { test_1403_1405: { n: 60, mean_net_pct: 4.7, win_pct: 73 }, train: { n: 285, mean_net_pct: 3.5 } },
-        rule_5d: { test_1403_1405: { n: 259, mean_net_pct: 1.1, win_pct: 59 }, train: { mean_net_pct: 1.4 } }, rule_3d: { test_mean_net_pct: 0.2, note: 'بعد از هزینه تقریباً صفر؛ پیشنهاد نمی‌شود' },
-        stop_hit_pct: 19, gross_7d_quantiles_pct: { p10: -8.0, p25: -2.5, median: 3.2, p75: 9.4, p90: 16.4 },
-        portfolio_3_slots_by_year_pct: { 1397: 50.5, 1398: 51.7, 1399: 8.6, 1400: 13.2, 1401: 16.0, 1402: 26.4, 1403: 16.9, 1404: 11.9, 1405: 13.1 },
+        risk_per_trade_pct: R(100 * risk, 2), position_pct_of_capital: R(100 * risk / stopPct, 1), position_pct_of_capital_at_1pct_risk: R(1 / stopPct, 1),
+        portfolio_rules: 'حداکثر ۳ نماد هم‌زمان، از هر نماد یکی؛ مجموع ریسک باز (heat) حداکثر ۲٪ سرمایه؛ هر سفارش حداکثر ۵٪ میانگین ارزش معاملات روزانهٔ ۲۰ روز نماد؛ توقف: اگر افت سبد از سقف به ۶٪ رسید یا ۳ معاملهٔ پشت‌سرهم به حد ضرر خورد، ۱۰ جلسه معاملهٔ چندروزهٔ جدید نه.',
+        note_targets: 'هدف ثابت (مثلاً ۳ برابر حد ضرر) در آزمون بازده را کم کرد؛ خروج زمانی بهتر بود. قیمت‌های مرجع هدف سفارش نیستند.' } : null,
+      backtest: { version: '2.5 (re-run to 1405/07/21; [estimate, 90% CI low, high], block bootstrap by entry day)',
+        rule_7d: { test_1403_1405: { n: 263, entry_days: 83, mean_net_pct: [2.3, 1.2, 3.5], median_net_pct: 3.0, win_pct: [60, 54, 66] }, train_1397_1402: { n: 1514, entry_days: 258, mean_net_pct: [2.8, 1.3, 4.4], win_pct: [58, 51, 66] },
+          by_year_net_pct: { 1397: 4.4, 1398: 2.2, 1399: 8.7, 1400: 1.2, 1401: 1.1, 1402: 4.0, 1403: 0.8, 1404: 1.9, 1405: 4.7 }, years_positive: '۹ از ۹ (۱۳۹۷ تا ۱۴۰۵)' },
+        rule_7d_weak_finish: { test_1403_1405: { n: 62, mean_net_pct: [4.8, 3.6, 6.4], win_pct: [74, 66, 84] }, train: { n: 281, mean_net_pct: [3.5, 1.4, 5.8] }, years_positive: '۸ از ۹ (۱۴۰۳: −۱٫۲٪، n=۱۲)' },
+        rule_5d: { test_1403_1405: { mean_net_pct: [1.2, 0.2, 2.1], win_pct: [60, 55, 67] }, train: { mean_net_pct: [1.3, 0.3, 2.4] }, years_positive: '۹ از ۹' },
+        rule_3d: { test_mean_net_pct: [0.2, -0.5, 0.7], years_positive: '۶ از ۹', note: 'بعد از هزینه تقریباً صفر؛ پیشنهاد نمی‌شود' },
+        no_gate_7d: { test_mean_net_pct: [-0.8, -1.9, 0.3], win_pct: 38 },
+        cost_sensitivity_test_mean_net_pct: { '1.0': [2.6, 1.5, 3.9], '1.25': [2.3, 1.2, 3.5], '1.5': [2.1, 0.9, 3.4], '2.0': [1.6, 0.5, 2.9], '2.5': [1.1, -0.1, 2.4] },
+        gate_note: 'دروازه پس از بررسی ۱۳ فیلتر زمان‌بندی روی کل دوره انتخاب شد؛ پس آزمون ۱۴۰۳ تا ۱۴۰۵ کاملاً دست‌نخورده نیست. حساسیت: آستانهٔ ۷٫۵ تا ۱۵٪ در ۲۰ جلسه همه مثبت (آموزش +۲٫۶ تا +۲٫۹٪، آزمون +۱٫۳ تا +۲٫۴٪).',
+        stop_hit_pct: 18, gross_7d_quantiles_pct: { p10: -8.0, p25: -2.5, median: 3.2, p75: 9.4, p90: 16.5 },
+        risk_book_3_slots: { risk_0_67pct: { total_1397_1405_pct: 35.5, max_drawdown_pct: -6.4, worst_day_pct: -2.9, by_year_pct: { 1397: 10.5, 1398: 2.9, 1399: 1.6, 1400: 1.4, 1401: -0.8, 1402: 2.3, 1403: 0.6, 1404: 5.9, 1405: 6.9 } },
+          risk_1pct: { total_1397_1405_pct: 56.1, max_drawdown_pct: -9.4, worst_day_pct: -4.3, by_year_pct: { 1397: 15.9, 1398: 4.1, 1399: 2.3, 1400: 2.1, 1401: -1.2, 1402: 3.5, 1403: 0.8, 1404: 8.8, 1405: 10.3 } }, avg_stop_pct: 8.1 },
         group_index_by_year_pct: { 1397: 115, 1398: 105, 1399: 193, 1400: 16, 1401: 71, 1402: 16, 1403: 5, 1404: 90, 1405: 159 },
-        note: 'هزینهٔ ۱٫۲۵٪ کسر شده. سبد ۳ جایگاهی در همهٔ سال‌ها مثبت بود ولی در سال‌های رونق از نگهداری ساده عقب ماند (بیشتر وقت‌ها بیرون از بازار است).' },
+        note: 'هزینهٔ ۱٫۲۵٪ کسر شده. سبد با ریسک ثابت فقط ۱۰ تا ۵۷٪ روزها در بازار است و در سال‌های رونق خیلی از نگهداری ساده عقب می‌ماند (۱۴۰۴: +۵٫۹٪ در برابر +۹۰٪ شاخص گروه ۲۳). بدترین روز با ۱٪ ریسک −۴٫۳٪ بود (گپ از حد ضرر عبور می‌کند)، پس ریسک واقعی ۳ معاملهٔ باز از ۳٪ بیشتر است.' },
       note: SEC === '23' ? '' : 'این قاعده روی پالایشی‌ها آزموده شده؛ برای این گروه آزموده نشده.' };
   }
   return out;
